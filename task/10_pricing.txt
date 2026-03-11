@@ -1,0 +1,127 @@
+================================================================
+PRICING PAGE (/pricing)
+================================================================
+
+File: app/pricing/page.tsx
+Route: /pricing
+Auth Required: No
+Type: Client component ("use client")
+
+================================================================
+DESCRIPTION
+================================================================
+
+Three-tier pricing display page with monthly/yearly toggle and FAQ section.
+This is a static marketing page with no API connections or payment integration.
+
+================================================================
+PRICING TIERS
+================================================================
+
+1. FREE PLAN — $0/forever
+   Features:
+   - 5 interview sessions per month
+   - Basic AI feedback
+   - 3 interview roles
+   - Email support
+   CTA: "Get Started" → /signup
+
+2. PRO PLAN — $29/month ($23.20/month yearly) — "Most Popular"
+   Features:
+   - Unlimited interview sessions
+   - Advanced AI feedback & analytics
+   - All interview roles
+   - Priority support
+   - Custom interview scenarios
+   CTA: "Start Pro Trial" → /signup
+
+3. ENTERPRISE PLAN — $99/month ($79.20/month yearly) — "Best Value"
+   Features:
+   - Everything in Pro
+   - Team management
+   - White-label solution
+   - Custom API access
+   - SSO integration
+   - Dedicated account manager
+   CTA: "Contact Sales" → (no link defined)
+
+================================================================
+YEARLY TOGGLE
+================================================================
+
+- Monthly/Yearly switch toggle
+- Yearly pricing shows 20% discount
+- Visual toggle with "Save 20%" label
+
+================================================================
+FAQ SECTION
+================================================================
+
+5 expandable accordion questions:
+1. How does AI interview practice work?
+2. Can I cancel my subscription anytime?
+3. What interview roles are available?
+4. Is my data secure?
+5. Do you offer refunds?
+
+================================================================
+COMPONENTS USED
+================================================================
+
+Custom Components:
+- Header (public navigation header)
+
+UI Components:
+- Card, CardContent, CardHeader, CardTitle
+- Button
+- Badge (for "Most Popular" / "Best Value" labels)
+
+Libraries:
+- framer-motion (animations)
+- lucide-react (icons)
+- next/link (navigation)
+
+================================================================
+API CALLS
+================================================================
+
+NONE — static page. No payment/subscription API integration yet.
+
+================================================================
+UI WIREFRAME
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ Header (public)                                          │
+├──────────────────────────────────────────────────────────┤
+│ "Choose Your Plan"                                       │
+│ [Monthly] ○───● [Yearly — Save 20%]                      │
+│                                                          │
+│ ┌──────────┐  ┌──────────────┐  ┌──────────────┐        │
+│ │ FREE     │  │ PRO ⭐       │  │ ENTERPRISE   │        │
+│ │ $0       │  │ $29/mo       │  │ $99/mo       │        │
+│ │ forever  │  │ Most Popular │  │ Best Value   │        │
+│ │          │  │              │  │              │        │
+│ │ 5 sess/mo│  │ Unlimited    │  │ Everything   │        │
+│ │ Basic AI │  │ Advanced AI  │  │ + Team mgmt  │        │
+│ │ 3 roles  │  │ All roles    │  │ + White label│        │
+│ │ Email    │  │ Priority     │  │ + Custom API │        │
+│ │          │  │ Custom scenes│  │ + SSO        │        │
+│ │ [Get     │  │ [Start Pro   │  │ [Contact     │        │
+│ │  Started]│  │  Trial]      │  │  Sales]      │        │
+│ └──────────┘  └──────────────┘  └──────────────┘        │
+│                                                          │
+│ FAQ Section (5 expandable questions)                      │
+│                                                          │
+│ CTA: [Start Free Trial → /signup] [Contact Sales]        │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+NAVIGATION
+================================================================
+
+- Header links: Features, Pricing (current), Success Stories, About, Sign In, Get Started
+- "Get Started" (free tier) → /signup
+- "Start Pro Trial" → /signup
+- "Contact Sales" → (not implemented)
+- Bottom CTA: "Start Free Trial" → /signup

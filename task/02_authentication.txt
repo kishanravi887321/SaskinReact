@@ -1,0 +1,243 @@
+================================================================
+AUTHENTICATION — Login, Signup, Forgot/Reset Password, Auth Flow
+================================================================
+
+Files involved:
+- app/login/page.tsx             (605 lines)
+- app/signup/page.tsx            (608 lines)
+- app/forgot-password/page.tsx
+- app/reset-password/page.tsx
+- hooks/use-auth.ts
+- components/protected-route.tsx
+- components/auth-status.tsx
+
+================================================================
+AUTH API ENDPOINTS
+================================================================
+
+1. POST /api/users/login/
+   Used In: Login page
+   Request:  { email, password }
+   Response: { access, refresh, otp_required? }
+   Notes: If otp_required is true, user must verify OTP before getting tokens.
+
+2. POST /api/users/auth/login/
+   Used In: Login page (OTP verification step)
+   Request:  { email, otp }
+   Response: { access, refresh }
+   Notes: Called after email/password login when OTP is required.
+
+3. POST /api/users/auth/google/
+   Used In: Login + Signup pages
+   Request:  { id_token }
+   Response: { accessToken, refreshToken, is_new_user }
+   Notes: Google Identity Services (GSI) script loaded dynamically. Uses NEXT_PUBLIC_GOOGLE_CLIENT_ID.
+
+4. POST /api/users/auth/register/
+   Used In: Signup page (Step 1 — send OTP)
+   Request:  { email }
+   Response: { detail }
+   Notes: Sends OTP to user's email for verification.
+
+5. POST /api/users/register/
+   Used In: Signup page (Step 2 — complete registration)
+   Request:  { email, otp, username, password }
+   Response: { detail }
+   Notes: Completes registration after OTP verification.
+
+6. POST /api/users/auth/forget-password/
+   Used In: Forgot Password page (send OTP)
+   Request:  { email }
+   Response: { detail }
+
+7. POST /api/users/forget-password/
+   Used In: Forgot Password page (reset with OTP)
+   Request:  { email, new_password, otp }
+   Response: { detail }
+
+8. POST /api/users/auth/update-password/
+   Used In: Reset Password page
+   Request:  { otp, new_password, confirm_password }
+   Response: { detail }
+
+================================================================
+AUTH FLOW DIAGRAM
+================================================================
+
+Login Flow:
+  1. User enters email + password
+  2. POST /api/users/login/ → { access, refresh } or { otp_required: true }
+  3. If OTP required → show OTP input → POST /api/users/auth/login/ with { email, otp }
+  4. Store tokens via useAuth().login(accessToken, refreshToken)
+  5. Redirect to /dashboard
+
+Google OAuth Flow:
+  1. Load Google Identity Services script dynamically
+  2. User clicks "Continue with Google"
+  3. Google returns id_token via callback
+  4. POST /api/users/auth/google/ with { id_token }
+  5. Response: { accessToken, refreshToken, is_new_user }
+  6. Store tokens via useAuth().login()
+  7. Redirect to /dashboard
+
+Signup Flow:
+  1. User enters username, email, password, confirm password
+  2. POST /api/users/auth/register/ with { email } → sends OTP
+  3. User enters OTP
+  4. POST /api/users/register/ with { email, otp, username, password }
+  5. On success → redirect to /login
+
+Forgot Password Flow:
+  1. User enters email
+  2. POST /api/users/auth/forget-password/ with { email } → sends OTP
+  3. User enters OTP + new password
+  4. POST /api/users/forget-password/ with { email, new_password, otp }
+  5. On success → redirect to /login
+
+Reset Password Flow:
+  1. User enters OTP + new password + confirm password
+  2. POST /api/users/auth/update-password/ with { otp, new_password, confirm_password }
+  3. On success → redirect to /login
+
+================================================================
+TOKEN STORAGE
+================================================================
+
+Storage: localStorage
+Keys:
+  - accessToken   → JWT access token
+  - refreshToken  → JWT refresh token
+  - username      → cached username
+
+Authorization Header: "Authorization: Bearer {accessToken}" on all authenticated requests.
+
+================================================================
+useAuth HOOK (hooks/use-auth.ts)
+================================================================
+
+Returns: {
+  isAuthenticated: boolean,
+  isLoading: boolean,
+  accessToken: string | null,
+  login(accessToken: string, refreshToken?: string): void,
+  logout(): void,
+  getTokens(): { accessToken, refreshToken }
+}
+
+Behavior:
+- On mount: checks localStorage for accessToken, sets isAuthenticated accordingly
+- login(): stores tokens in localStorage, sets isAuthenticated = true
+- logout(): clears all tokens from localStorage, sets isAuthenticated = false
+- isLoading: true while checking initial auth state
+
+================================================================
+ProtectedRoute COMPONENT (components/protected-route.tsx)
+================================================================
+
+Props: {
+  children: React.ReactNode,
+  redirectTo?: string  (default: "/login")
+}
+
+Used In: Dashboard page, Profile page
+
+Behavior:
+- Checks useAuth() for isAuthenticated
+- If loading → shows loading spinner
+- If not authenticated → redirects to redirectTo via router.push()
+- If authenticated → renders children
+
+================================================================
+AuthStatus COMPONENT (components/auth-status.tsx)
+================================================================
+
+Props: None
+Used In: Landing page (shown when user is already authenticated instead of normal landing content)
+
+Features:
+- "Welcome Back" card with links to:
+  - Dashboard (/dashboard)
+  - Profile Settings (/profile)
+  - Logout button (calls useAuth().logout())
+
+================================================================
+LOGIN PAGE UI LAYOUT
+================================================================
+
+┌──────────────────────────────────────────────┐
+│ ← Back to Home                               │
+│                                              │
+│ ┌──────────────────────────────────────────┐ │
+│ │ SakSin AI Logo                           │ │
+│ │ "Welcome Back"                           │ │
+│ │                                          │ │
+│ │ [Email Input]                            │ │
+│ │ [Password Input + show/hide toggle]      │ │
+│ │ [Remember Me] [Forgot password? →]       │ │
+│ │ [Sign In Button]                         │ │
+│ │                                          │ │
+│ │ ── Or continue with ──                   │ │
+│ │ [Continue with Google]                   │ │
+│ │                                          │ │
+│ │ Don't have an account? [Sign up →]       │ │
+│ └──────────────────────────────────────────┘ │
+│                                              │
+│ OTP Step (conditional):                      │
+│ │ [OTP Input] [Resend OTP]                 │ │
+│ │ [Verify OTP Button]                      │ │
+└──────────────────────────────────────────────┘
+
+Components Used:
+- UI: Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Checkbox
+- Hooks: useAuth (login function)
+- External: Google Identity Services (GSI) script
+
+================================================================
+SIGNUP PAGE UI LAYOUT
+================================================================
+
+┌──────────────────────────────────────────────┐
+│ ← Back to Home                               │
+│                                              │
+│ ┌──────────────────────────────────────────┐ │
+│ │ SakSin AI Logo                           │ │
+│ │ "Create Your Account"                    │ │
+│ │                                          │ │
+│ │ [Username Input]                         │ │
+│ │ [Email Input]                            │ │
+│ │ [Password Input + toggle]                │ │
+│ │ [Confirm Password Input + toggle]        │ │
+│ │ [□ Agree to Terms] [□ Subscribe]         │ │
+│ │ [Create Account Button]                  │ │
+│ │                                          │ │
+│ │ ── Or sign up with ──                    │ │
+│ │ [Continue with Google]                   │ │
+│ │                                          │ │
+│ │ Already have an account? [Sign in →]     │ │
+│ └──────────────────────────────────────────┘ │
+│                                              │
+│ OTP Verification Step:                       │
+│ │ [OTP Input] [Resend OTP]                 │ │
+│ │ [Verify Account Button]                  │ │
+└──────────────────────────────────────────────┘
+
+Components Used:
+- UI: Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Checkbox
+- Hooks: useAuth (login function)
+- External: Google Identity Services
+
+================================================================
+FORGOT PASSWORD PAGE UI
+================================================================
+
+Components Used:
+- UI: Card, CardContent, CardHeader, CardTitle, Button, Input, Label
+- Two-step form: email → OTP + new password
+
+================================================================
+RESET PASSWORD PAGE UI
+================================================================
+
+Components Used:
+- UI: Card, CardContent, CardHeader, CardTitle, Button, Input, Label
+- Single form: OTP + new password + confirm password

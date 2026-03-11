@@ -1,0 +1,108 @@
+================================================================
+DEPENDENCIES
+================================================================
+
+All packages from package.json with versions and usage locations.
+
+================================================================
+CORE FRAMEWORK
+================================================================
+
+next                        15.2.4      React framework (App Router)
+react                       ^19         UI library
+react-dom                   ^19         React DOM renderer
+typescript                  ^5          TypeScript compiler
+
+================================================================
+UI & STYLING
+================================================================
+
+tailwindcss                 ^3.4.17     Utility-first CSS framework — used in all files
+tailwindcss-animate         ^1.0.7      Animation utilities — extends Tailwind config
+class-variance-authority    ^0.7.1      Dynamic class variants — all shadcn/ui components (cva())
+clsx                        ^2.1.1      Conditional class joining — lib/utils.ts (cn function)
+tailwind-merge              ^2.5.5      Merge Tailwind classes — lib/utils.ts (cn function)
+framer-motion               latest      Animations & transitions — every page (motion.div, AnimatePresence)
+lucide-react                ^0.454.0    Icon library — every page and component
+next-themes                 ^0.4.4      Theme switching — components/theme-provider.tsx
+
+================================================================
+RADIX UI (shadcn/ui PRIMITIVES)
+================================================================
+
+@radix-ui/react-accordion           → components/ui/accordion.tsx
+@radix-ui/react-alert-dialog        → components/ui/alert-dialog.tsx
+@radix-ui/react-aspect-ratio        → components/ui/aspect-ratio.tsx
+@radix-ui/react-avatar              → components/ui/avatar.tsx
+@radix-ui/react-checkbox            → components/ui/checkbox.tsx
+@radix-ui/react-collapsible         → components/ui/collapsible.tsx
+@radix-ui/react-context-menu        → components/ui/context-menu.tsx
+@radix-ui/react-dialog              → components/ui/dialog.tsx
+@radix-ui/react-dropdown-menu       → components/ui/dropdown-menu.tsx
+@radix-ui/react-hover-card          → components/ui/hover-card.tsx
+@radix-ui/react-label               → components/ui/label.tsx
+@radix-ui/react-menubar             → components/ui/menubar.tsx
+@radix-ui/react-navigation-menu     → components/ui/navigation-menu.tsx
+@radix-ui/react-popover             → components/ui/popover.tsx
+@radix-ui/react-progress            → components/ui/progress.tsx
+@radix-ui/react-radio-group         → components/ui/radio-group.tsx
+@radix-ui/react-scroll-area         → components/ui/scroll-area.tsx
+@radix-ui/react-select              → components/ui/select.tsx
+@radix-ui/react-separator           → components/ui/separator.tsx
+@radix-ui/react-slider              → components/ui/slider.tsx
+@radix-ui/react-slot                → components/ui/button.tsx (Slot for composition)
+@radix-ui/react-switch              → components/ui/switch.tsx
+@radix-ui/react-tabs                → components/ui/tabs.tsx
+@radix-ui/react-toast               → components/ui/toast.tsx
+@radix-ui/react-toggle              → components/ui/toggle.tsx
+@radix-ui/react-toggle-group        → components/ui/toggle-group.tsx
+@radix-ui/react-tooltip             → components/ui/tooltip.tsx
+
+================================================================
+FORM & VALIDATION
+================================================================
+
+react-hook-form             ^7.54.1     Form management — available but NOT actively used (forms use manual useState)
+@hookform/resolvers         ^3.9.1      Form validation resolvers — available for Zod integration
+zod                         ^3.24.1     Schema validation — available but NOT actively used
+input-otp                   1.4.1       OTP input component — components/ui/input-otp.tsx
+
+================================================================
+DATA VISUALIZATION
+================================================================
+
+recharts                    2.15.0      Charting library — components/ui/chart.tsx (available, not actively used in pages)
+
+================================================================
+OTHER LIBRARIES
+================================================================
+
+sonner                      ^1.7.1      Toast notifications — components/ui/sonner.tsx
+vaul                        ^0.9.6      Drawer component — components/ui/drawer.tsx
+date-fns                    4.1.0       Date utilities — components/ui/calendar.tsx
+react-day-picker            8.10.1      Calendar/date picker — components/ui/calendar.tsx
+embla-carousel-react        8.5.1       Carousel — components/ui/carousel.tsx
+react-resizable-panels      ^2.1.7      Resizable panels — components/ui/resizable.tsx
+cmdk                        1.0.4       Command palette — components/ui/command.tsx
+google-auth-library         ^10.1.0     Google auth (server-side) — available
+@emotion/is-prop-valid      latest      Prop validation for Framer Motion — runtime dependency
+
+================================================================
+DEV DEPENDENCIES
+================================================================
+
+@types/node                 ^20         Node.js type definitions
+@types/react                ^19         React type definitions
+@types/react-dom            ^19         React DOM type definitions
+postcss                     ^8          CSS processing
+eslint                      ^9          Linting
+eslint-config-next          15.2.4      Next.js ESLint rules
+
+================================================================
+SCRIPTS (package.json)
+================================================================
+
+dev         next dev          Start development server
+build       next build        Production build
+start       next start        Start production server
+lint        next lint         Run ESLint

@@ -1,0 +1,219 @@
+================================================================
+BACKEND INTEGRATION GUIDE — What to Preserve When Redesigning
+================================================================
+
+This file summarizes all backend integration points that MUST be preserved
+when rebuilding the frontend UI. This is the contract between frontend and backend.
+
+================================================================
+1. ENVIRONMENT VARIABLES
+================================================================
+
+NEXT_PUBLIC_API_URL              Main backend API (default: http://localhost:8000)
+NEXT_PUBLIC_API_URL1             Chatbot service API (default: http://localhost:8005)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID     Google OAuth 2.0 Client ID
+
+================================================================
+2. AUTHENTICATION TOKENS
+================================================================
+
+Storage: localStorage
+Keys:
+  - accessToken    JWT access token
+  - refreshToken   JWT refresh token
+  - username       Cached username
+
+Authorization Header (all authenticated requests):
+  Authorization: Bearer {accessToken}
+
+================================================================
+3. ALL API ENDPOINTS
+================================================================
+
+--- Authentication ---
+POST /api/users/login/                    Email/password login
+POST /api/users/auth/login/               OTP verification after login
+POST /api/users/auth/google/              Google OAuth login/signup
+POST /api/users/auth/register/            Send registration OTP
+POST /api/users/register/                 Complete registration
+POST /api/users/auth/forget-password/     Send password reset OTP
+POST /api/users/forget-password/          Reset password with OTP
+POST /api/users/auth/update-password/     Update password with OTP
+
+--- User Profile ---
+GET  /api/users/profile/                  Get authenticated user profile
+PATCH /api/users/profile/update/          Update profile (FormData)
+POST /api/users/check-username/           Check username availability
+GET  /api/user/profile                    Fallback profile endpoint
+
+--- Interview ---
+POST /api/central/v1/interview/start/     Start interview session
+POST /api/central/v1/interview/answer/    Submit answer, get feedback + next question
+POST /api/central/v1/interview/end/       End interview session (defined, not used)
+
+--- Chatbot ---
+POST {API_URL1}/chat/get/                 Query chatbot about a user (DIFFERENT base URL)
+POST /api/users/chat/feed/                Feed content to chatbot
+
+================================================================
+4. REQUEST/RESPONSE FORMATS
+================================================================
+
+--- Login ---
+Request:  { email: string, password: string }
+Response: { access: string, refresh: string, otp_required?: boolean }
+
+--- OTP Login ---
+Request:  { email: string, otp: string }
+Response: { access: string, refresh: string }
+
+--- Google Auth ---
+Request:  { id_token: string }
+Response: { accessToken: string, refreshToken: string, is_new_user: boolean }
+
+--- Register (Step 1) ---
+Request:  { email: string }
+Response: { detail: string }
+
+--- Register (Step 2) ---
+Request:  { email: string, otp: string, username: string, password: string }
+Response: { detail: string }
+
+--- Forgot Password (Send OTP) ---
+Request:  { email: string }
+Response: { detail: string }
+
+--- Forgot Password (Reset) ---
+Request:  { email: string, new_password: string, otp: string }
+Response: { detail: string }
+
+--- Update Password ---
+Request:  { otp: string, new_password: string, confirm_password: string }
+Response: { detail: string }
+
+--- Get Profile ---
+Response: {
+  id: number, username: string, email: string, name?: string,
+  first_name?: string, last_name?: string, role: string, bio: string,
+  profile: string, photo?: string, date_joined: string, is_active: boolean,
+  social_links?: { linkedin, github, twitter, website }
+}
+
+--- Update Profile ---
+Request: FormData with fields:
+  username, role, bio, name, social_links (JSON string), photo (File optional)
+Response: Updated profile object
+
+--- Check Username ---
+Request:  { username: string }
+Response: { available: boolean }
+
+--- Start Interview ---
+Request: {
+  role: string, interview_type: string, difficulty: string,
+  duration_minutes: number, experience: string, position: string,
+  industry: string, skills: string[], custom_questions?: string[]
+}
+Response: {
+  status: string, session_id: string, question: string,
+  progress: { current_question: number, total_questions: number },
+  session_info: object
+}
+
+--- Submit Answer ---
+Request:  { session_id: string, answer: string }
+Response: {
+  status: "continue" | "success",
+  next_question: string | null,
+  feedback: { score, feedback, strengths, improvements, suggestions, overall_assessment },
+  progress: { current_question, total_questions }
+}
+
+--- Chatbot Get ---
+Request:  { email: string, query: string, timestamp: string }
+Response: { response | answer | text | message: string }
+
+--- Chatbot Feed (New) ---
+Request:  { content: string, timestamp: string }
+Response: { api_key: string, message?: string, status?: string }
+
+--- Chatbot Feed (Refeed) ---
+Request:  { content: string, api_key: string, refeed: true, timestamp: string }
+Response: { api_key: string, message?: string, status?: string }
+
+================================================================
+5. KEY HOOKS TO PRESERVE
+================================================================
+
+useAuth (hooks/use-auth.ts):
+  - Manages JWT tokens in localStorage
+  - Provides: isAuthenticated, isLoading, accessToken, login(), logout(), getTokens()
+  - Used by: almost every authenticated page/component
+
+useUser (hooks/use-user.ts):
+  - Fetches user profile when authenticated
+  - Provides: user, isLoading, error, refreshUser(), clearUser()
+  - Depends on: useAuth, getUserProfile() from lib/api.ts
+
+================================================================
+6. KEY UTILITY FILES TO PRESERVE
+================================================================
+
+lib/api.ts:
+  - API_ENDPOINTS object with all endpoint paths
+  - apiRequest<T>() generic fetch wrapper with Bearer token
+  - startInterview(), submitAnswer(), getUserProfile() functions
+  - Type definitions: InterviewConfig, UserProfile, InterviewSession, ApiResponse
+
+lib/user-utils.ts:
+  - normalizeUserData() — handles varying API response shapes
+  - getDisplayName() — priority-based name extraction
+  - getUserInitials() — initials from name fields
+  - getProfileImage() — priority-based image URL extraction
+
+lib/utils.ts:
+  - cn() — Tailwind class merging (clsx + twMerge)
+  - getStoredTokens(), clearStoredTokens(), hasValidTokens()
+
+================================================================
+7. GOOGLE OAUTH INTEGRATION
+================================================================
+
+- Loads Google Identity Services script dynamically:
+  https://accounts.google.com/gsi/client
+- Uses NEXT_PUBLIC_GOOGLE_CLIENT_ID
+- Receives id_token via google.accounts.id.initialize callback
+- Sends id_token to POST /api/users/auth/google/
+- Response includes accessToken, refreshToken, is_new_user flag
+
+================================================================
+8. INTERVIEW SESSION LIFECYCLE
+================================================================
+
+1. User selects role from /roles
+2. Navigates to /interview/[role]
+3. Configures interview settings (type, difficulty, duration, etc.)
+4. POST /start/ → receives session_id + first question
+5. Loop: display question → user answers → POST /answer/ → get feedback + next question
+6. When no more questions → interview complete → redirect to /feedback
+7. (Optional) POST /end/ to explicitly end session
+
+================================================================
+9. PAGES WITH MOCK DATA (Not yet connected to backend)
+================================================================
+
+These pages use hardcoded data and need real API endpoints:
+
+- /dashboard       → session stats, recent sessions, upcoming sessions, progress
+- /feedback        → interview results, per-question scores, AI feedback
+- /insights        → performance trends, skills breakdown, company performance, weekly activity
+- /subscription    → current plan, usage analytics, billing history
+
+Pages with LIVE API connections:
+- /login           → auth endpoints
+- /signup          → auth endpoints
+- /forgot-password → auth endpoints
+- /reset-password  → auth endpoints
+- /interview/[role] → interview start/answer endpoints
+- /profile         → profile CRUD endpoints
+- Chatbot widget   → chat get/feed endpoints

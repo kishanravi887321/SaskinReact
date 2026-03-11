@@ -1,0 +1,209 @@
+================================================================
+PROFILE PAGE (/profile)
+================================================================
+
+File: app/profile/page.tsx (1347 lines)
+Route: /profile
+Auth Required: YES (wrapped in ProtectedRoute)
+Type: Client component ("use client")
+
+================================================================
+DESCRIPTION
+================================================================
+
+User profile page with view and edit modes. Displays user info, avatar,
+social links, skills, achievements, and activity. Supports profile photo
+upload, username editing with availability check, and social links editing.
+
+================================================================
+PROFILE API ENDPOINTS
+================================================================
+
+1. GET /api/users/profile/
+   Auth: Bearer Token
+   Used In: Profile page (initial load), useUser hook, DashboardHeader
+   Response: {
+     id: number,
+     username: string,
+     email: string,
+     name?: string,
+     first_name?: string,
+     last_name?: string,
+     role: string,
+     bio: string,
+     profile: string,        // profile image URL (legacy field)
+     photo?: string,         // profile image URL (new field)
+     date_joined: string,
+     is_active: boolean,
+     social_links?: {
+       linkedin: string,
+       github: string,
+       twitter: string,
+       website: string
+     }
+   }
+
+2. PATCH /api/users/profile/update/
+   Auth: Bearer Token
+   Used In: Profile page (save changes)
+   Request: FormData containing:
+     - username: string
+     - role: string
+     - bio: string
+     - name: string
+     - social_links: JSON string of { linkedin, github, twitter, website }
+     - photo: File (optional, only when new avatar uploaded)
+   Response: Updated profile object
+
+3. POST /api/users/check-username/
+   Auth: Bearer Token
+   Used In: Profile page (username edit)
+   Request: { username: string }
+   Response: { available: boolean } or error
+
+4. GET /api/user/profile
+   Auth: Bearer Token
+   Used In: DashboardHeader (fallback endpoint)
+   Response: User profile object
+
+================================================================
+USER DATA NORMALIZATION (lib/user-utils.ts)
+================================================================
+
+The API returns user data in varying formats. user-utils.ts normalizes this:
+
+UnifiedUserProfile interface:
+{
+  id, email, username, firstName, lastName, name,
+  role, bio, profileImage, dateJoined, isActive, socialLinks
+}
+
+normalizeUserData(data): any → UnifiedUserProfile
+  - Maps different API field names to unified shape
+  - Handles: first_name/firstName, last_name/lastName, profile/photo/profile_picture
+
+getDisplayName(user): string
+  - Priority: first+last → first → name → username → email prefix → "User"
+
+getUserInitials(user): string
+  - Extracts 1-2 character initials from available name fields
+
+getProfileImage(user): string
+  - Priority: profile_picture → photo → profile → "/placeholder-user.jpg"
+
+================================================================
+PROFILE VIEW MODE
+================================================================
+
+Displays:
+- Avatar (with photo URL or initials fallback)
+- Username, role, email, location
+- Member since date (date_joined)
+- Bio text
+- Social links (LinkedIn, GitHub, Twitter, Website) — clickable icons
+- Action buttons: Edit Profile, Share, Download
+
+Tabs:
+- Overview: Skills progress bars + Achievements grid
+- Achievements: Detailed achievement cards
+- Activity: Activity feed (placeholder)
+
+Skills (hardcoded):
+- Technical: 85%
+- Communication: 92%
+- Problem Solving: 78%
+- Leadership: 88%
+- System Design: 75%
+- Behavioral: 90%
+
+Achievements (hardcoded):
+- First Interview ✓, Perfect Score ✓, Consistency King ✓
+- Tech Master ✗, Communication Pro ✓, Marathon Runner ✗
+
+================================================================
+PROFILE EDIT MODE
+================================================================
+
+Editable fields:
+- Profile photo (click avatar to upload, file input)
+- Username (with live availability check via POST /check-username/)
+- Display name
+- Role (dropdown: Software Engineer, Product Manager, Data Analyst, etc.)
+- Bio (textarea)
+- Social links: LinkedIn, GitHub, Twitter, Website (text inputs)
+
+Save → PATCH /api/users/profile/update/ with FormData
+Cancel → revert to view mode
+
+================================================================
+COMPONENTS USED
+================================================================
+
+Custom Components:
+- ProtectedRoute (wraps entire page — auth guard)
+- DashboardHeader (authenticated navigation header)
+
+UI Components:
+- Card, CardContent, CardHeader, CardTitle
+- Button
+- Avatar, AvatarFallback, AvatarImage
+- Badge
+- Progress
+- DropdownMenu + items
+- Input, Label
+- Textarea
+- Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+- Tabs, TabsContent, TabsList, TabsTrigger
+
+Hooks:
+- useAuth (accessToken for API calls)
+
+Libraries:
+- framer-motion (animations)
+- lucide-react (icons)
+
+================================================================
+UI WIREFRAME
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ DashboardHeader                                          │
+├──────────────────────────────────────────────────────────┤
+│ ┌─ Profile Card ──────────────────────────────────────┐  │
+│ │ [Avatar/Photo]                                     │  │
+│ │ {username} • {role}                                │  │
+│ │ {email} • {location}                               │  │
+│ │ Member since {date_joined}                         │  │
+│ │ {bio}                                              │  │
+│ │ Social: [LinkedIn] [GitHub] [Twitter] [Website]    │  │
+│ │ [Edit Profile] [Share] [Download]                  │  │
+│ └────────────────────────────────────────────────────┘  │
+│                                                          │
+│ [Overview] [Achievements] [Activity] Tabs                │
+│                                                          │
+│ ┌─ Skills ──────────────┐ ┌─ Achievements ──────────┐   │
+│ │ Technical: 85%        │ │ 🎯 First Interview ✓    │   │
+│ │ Communication: 92%    │ │ 🏆 Perfect Score ✓      │   │
+│ │ Problem Solving: 78%  │ │ 🔥 Consistency King ✓   │   │
+│ │ Leadership: 88%       │ │ 💻 Tech Master ✗        │   │
+│ │ System Design: 75%    │ │ 🗣️ Communication Pro ✓  │   │
+│ │ Behavioral: 90%       │ │ 🏃 Marathon Runner ✗    │   │
+│ └───────────────────────┘ └─────────────────────────┘   │
+│                                                          │
+│ Edit Mode (toggled):                                     │
+│ [Username] [Name] [Role dropdown] [Bio textarea]         │
+│ [Profile photo upload]                                   │
+│ [Social links inputs]                                    │
+│ [Save Changes] [Cancel]                                  │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+KEY LOGIC
+================================================================
+
+1. On mount: fetch profile via GET /api/users/profile/ (direct fetch, not useUser)
+2. Edit mode toggle: switches between view and edit forms
+3. Username change: debounced POST /check-username/ to verify availability
+4. Photo upload: file input → preview via URL.createObjectURL → include in FormData
+5. Save: PATCH /api/users/profile/update/ with all fields as FormData
+6. Social links sent as JSON string within FormData

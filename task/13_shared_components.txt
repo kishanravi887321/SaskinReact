@@ -1,0 +1,263 @@
+================================================================
+SHARED COMPONENTS
+================================================================
+
+This file documents all reusable custom components (excluding page-specific
+logic and shadcn/ui primitives).
+
+================================================================
+1. Header — Public Site Header
+================================================================
+
+File: components/header.tsx
+Type: Client component ("use client")
+Props: None
+Used In: Landing page (/), Pricing page (/pricing)
+
+Description:
+  Public-facing navigation header shown on non-authenticated pages.
+
+Features:
+  - SakSin AI logo (links to /)
+  - Navigation links: Features, Pricing, Success Stories, About
+  - "Sign In" button → /login
+  - "Get Started" button → /signup
+  - Mobile: hamburger menu with slide-out navigation
+  - Scroll-based background opacity change
+
+Children: Button (ui), next/link
+
+================================================================
+2. DashboardHeader — Authenticated Header
+================================================================
+
+File: components/dashboard-header.tsx (296 lines)
+Type: Client component
+Props: None
+Used In: Dashboard, Insights, Profile, Subscription pages
+
+Description:
+  Navigation header for authenticated/dashboard pages. Shows user avatar,
+  notifications, and profile dropdown.
+
+Features:
+  - Logo → /dashboard
+  - Nav links: Dashboard (/dashboard), Practice (/roles), Insights (/insights), Profile (/profile)
+  - Search input bar
+  - Notifications dropdown (3 hardcoded notifications)
+  - User avatar dropdown with:
+    - Profile link → /profile
+    - Settings link (TBD)
+    - Sign Out (calls useAuth().logout(), redirects to /)
+  - Mobile: hamburger menu
+
+Hooks Used:
+  - useAuth (logout function, accessToken)
+  - useUser (user profile data)
+
+Libraries Used:
+  - normalizeUserData, getDisplayName, getUserInitials, getProfileImage from lib/user-utils
+
+Children:
+  - Button, Avatar, AvatarFallback, AvatarImage
+  - DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+
+Data Flow:
+  1. useUser() → fetches profile via GET /api/users/profile/
+  2. If useUser fails → fallback direct fetch to /api/user/profile (alternative endpoint)
+  3. normalizeUserData() → unified shape
+  4. getDisplayName(), getUserInitials(), getProfileImage() → display values
+
+================================================================
+3. LayoutWrapper — Root Layout Wrapper
+================================================================
+
+File: components/layout-wrapper.tsx
+Type: Client component
+Props: { children: React.ReactNode }
+Used In: Root layout (app/layout.tsx) — wraps ALL pages
+
+Description:
+  Wraps all page content and conditionally renders the Chatbot widget
+  when the user is authenticated.
+
+Logic:
+  const { isAuthenticated, isLoading } = useAuth();
+  return (
+    <>
+      {children}
+      {isAuthenticated && !isLoading && <Chatbot />}
+    </>
+  );
+
+Children: {children}, Chatbot (conditional)
+
+================================================================
+4. ProtectedRoute — Auth Guard
+================================================================
+
+File: components/protected-route.tsx
+Type: Client component
+Props: {
+  children: React.ReactNode,
+  redirectTo?: string  // default: "/login"
+}
+Used In: Dashboard page, Profile page
+
+Description:
+  HOC that protects pages requiring authentication. Checks useAuth()
+  and either renders children or redirects to login.
+
+Logic:
+  - isLoading → return loading spinner (centered)
+  - !isAuthenticated → router.push(redirectTo) + return null
+  - isAuthenticated → return children
+
+================================================================
+5. AuthStatus — Auth Status Display
+================================================================
+
+File: components/auth-status.tsx
+Type: Client component
+Props: None
+Used In: Landing page (/ — shown when user is already authenticated)
+
+Description:
+  Replaces landing page content when user is authenticated. Shows a
+  "Welcome Back" card with quick navigation links.
+
+Features:
+  - Authenticated state: Card with "Welcome Back" title
+    - Button: "Go to Dashboard" → /dashboard
+    - Button: "Profile Settings" → /profile
+    - Button: "Logout" (calls useAuth().logout())
+  - Not authenticated: Card with "Login Required"
+    - Button: "Go to Login" → /login
+
+Hooks: useAuth (isAuthenticated, isLoading, logout)
+Children: Card, CardContent, Button
+
+================================================================
+6. SubscriptionStatus — Plan Status Widget
+================================================================
+
+File: components/subscription-status.tsx
+Type: Client component
+Props: {
+  plan?: "free" | "pro" | "enterprise"     // default: "free"
+  usage?: {
+    sessionsUsed: number,
+    sessionsLimit: number,
+    period: string
+  }
+  nextBilling?: string                      // date string
+  showUpgrade?: boolean                     // default: true
+}
+Used In: Dashboard page (sidebar), Subscription page (sidebar)
+
+Description:
+  Reusable subscription widget showing the user's current plan tier,
+  usage statistics, and upgrade CTA.
+
+Features:
+  - Plan badge (Free/Pro/Enterprise with color coding)
+  - Free plan: usage progress bar (sessionsUsed / sessionsLimit)
+  - Free plan: low-session warning when usage > 80%
+  - Paid plans: "Manage Billing" and "View Usage" buttons
+  - Next billing date display
+  - "Upgrade Plan" button → /pricing (if showUpgrade is true)
+
+Children: Card, CardContent, Button, Badge, Progress
+
+================================================================
+7. ThemeProvider — Theme Context
+================================================================
+
+File: components/theme-provider.tsx
+Type: Client component
+Props: ThemeProviderProps (from next-themes)
+Used In: NOT currently used in root layout
+
+Description:
+  Simple wrapper around next-themes ThemeProvider. Available but not
+  integrated. Dark mode is currently set via className="dark" on <html>.
+
+Code:
+  export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+    return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+  }
+
+================================================================
+8. Root Layout (app/layout.tsx)
+================================================================
+
+File: app/layout.tsx
+Type: Server component (no "use client")
+
+Description:
+  The root layout that wraps all pages. Sets up:
+  - HTML: lang="en", className="dark"
+  - Font: Inter (Google Fonts via next/font/google)
+  - Body className: Inter font + dark background + text color + antialiased
+  - Wraps children in LayoutWrapper
+
+Metadata:
+  - title: "InterviewAI - Master Your Next AI Interview"
+  - description: AI interview preparation platform description
+
+Structure:
+  <html lang="en" className="dark">
+    <body className={`${inter.className} bg-gray-950 text-white antialiased`}>
+      <LayoutWrapper>{children}</LayoutWrapper>
+    </body>
+  </html>
+
+================================================================
+COMPONENT HIERARCHY TREE
+================================================================
+
+RootLayout (app/layout.tsx)
+└── LayoutWrapper
+    ├── {page content}
+    │   ├── Header (public pages: /, /pricing)
+    │   │   └── Button, navigation links
+    │   │
+    │   ├── DashboardHeader (auth pages: /dashboard, /insights, /profile, /subscription)
+    │   │   ├── Avatar + AvatarFallback + AvatarImage
+    │   │   └── DropdownMenu (notifications, profile)
+    │   │
+    │   ├── ProtectedRoute (wraps /dashboard, /profile)
+    │   │   └── {page children}
+    │   │
+    │   ├── SubscriptionStatus (/dashboard sidebar, /subscription sidebar)
+    │   │   ├── Card + CardContent
+    │   │   ├── Badge
+    │   │   ├── Progress
+    │   │   └── Button
+    │   │
+    │   └── AuthStatus (/ when authenticated)
+    │       └── Card + Button
+    │
+    └── Chatbot (floating, all authenticated pages)
+        ├── Card + CardContent + CardHeader
+        ├── Textarea
+        ├── Badge
+        └── Button
+
+================================================================
+shadcn/ui COMPONENTS USAGE MAP
+================================================================
+
+Button          → Every page and component
+Card family     → Dashboard, Login, Signup, Feedback, Insights, Profile, Pricing, Subscription, AuthStatus, SubscriptionStatus, Chatbot
+Input           → Login, Signup, Forgot Password, Reset Password, Profile, Interview Setup, Dashboard search
+Label           → Login, Signup, Forgot Password, Reset Password, Profile, Interview Setup
+Progress        → Dashboard, Feedback, Insights, Profile, Subscription, SubscriptionStatus
+Badge           → Interview, Pricing, Subscription, SubscriptionStatus
+Avatar family   → DashboardHeader, Interview Setup
+DropdownMenu    → DashboardHeader, Dashboard, Insights, Profile, Subscription, Interview
+Select family   → Interview Setup, Profile
+Textarea        → Interview, Profile, Chatbot
+Checkbox        → Login, Signup
+Tabs family     → Profile
+Accordion       → Pricing (FAQ section)

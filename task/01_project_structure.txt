@@ -1,0 +1,158 @@
+================================================================
+PROJECT STRUCTURE & CONFIGURATION
+================================================================
+App Name: SakSin AI (InterviewAI)
+Framework: Next.js 15.2.4 (App Router) + React 19 + TypeScript 5
+Styling: Tailwind CSS 3 + shadcn/ui + Framer Motion
+
+================================================================
+DIRECTORY TREE
+================================================================
+
+main_src/
+├── app/                          # Next.js App Router — all pages/routes
+│   ├── globals.css               # Global CSS (Tailwind directives, CSS variables, custom animations)
+│   ├── layout.tsx                # Root layout (Inter font, dark mode, LayoutWrapper)
+│   ├── page.tsx                  # Landing page (/)
+│   ├── dashboard/
+│   │   ├── page.tsx              # Dashboard (/dashboard) — protected
+│   │   └── loading.tsx           # Dashboard loading state
+│   ├── feedback/
+│   │   └── page.tsx              # Interview feedback (/feedback)
+│   ├── forgot-password/
+│   │   └── page.tsx              # Forgot password flow (/forgot-password)
+│   ├── insights/
+│   │   └── page.tsx              # Performance insights (/insights)
+│   ├── interview/
+│   │   └── [role]/
+│   │       └── page.tsx          # Live interview session (/interview/:role) — dynamic route
+│   ├── login/
+│   │   └── page.tsx              # Login page (/login)
+│   ├── pricing/
+│   │   └── page.tsx              # Pricing plans (/pricing)
+│   ├── profile/
+│   │   └── page.tsx              # User profile (/profile) — protected
+│   ├── reset-password/
+│   │   └── page.tsx              # Reset password with OTP (/reset-password)
+│   ├── roles/
+│   │   └── page.tsx              # Role selection (/roles)
+│   ├── signup/
+│   │   └── page.tsx              # Sign up page (/signup)
+│   └── subscription/
+│       └── page.tsx              # Subscription management (/subscription)
+│
+├── components/                   # Reusable application-level components
+│   ├── auth-status.tsx           # Auth status display (authenticated/not)
+│   ├── chatbot.tsx               # AI Chatbot widget (Get Info / Feed Data)
+│   ├── chatbot_clean.tsx         # Clean version of chatbot (unused/backup)
+│   ├── dashboard-header.tsx      # Header for authenticated dashboard pages
+│   ├── header.tsx                # Public landing/pricing page header
+│   ├── layout-wrapper.tsx        # Root wrapper — conditionally renders Chatbot
+│   ├── protected-route.tsx       # Auth guard HOC — redirects to /login if unauthenticated
+│   ├── subscription-status.tsx   # Subscription plan status card widget
+│   ├── theme-provider.tsx        # next-themes wrapper (dark mode support)
+│   └── ui/                       # shadcn/ui primitive components (40+ components)
+│
+├── hooks/                        # Custom React hooks
+│   ├── use-auth.ts               # Authentication state management (localStorage tokens)
+│   ├── use-mobile.tsx            # Mobile viewport detection
+│   ├── use-toast.ts              # Toast notification hook
+│   └── use-user.ts              # User profile data fetching hook
+│
+├── lib/                          # Utility libraries
+│   ├── api.ts                    # API client (endpoints, request helpers, types)
+│   ├── user-utils.ts             # User data normalization utilities
+│   └── utils.ts                  # General utilities (cn(), token helpers)
+│
+├── public/                       # Static assets
+├── styles/
+│   └── globals.css               # Additional global styles
+│
+├── components.json               # shadcn/ui configuration
+├── next.config.mjs               # Next.js configuration
+├── package.json                  # Dependencies and scripts
+├── postcss.config.mjs            # PostCSS configuration
+├── tailwind.config.ts            # Tailwind CSS configuration
+└── tsconfig.json                 # TypeScript configuration
+
+================================================================
+DIRECTORY PURPOSE SUMMARY
+================================================================
+
+app/            Next.js App Router pages. Each folder = a route. Uses "use client" directive on all pages (client-side rendering).
+components/     Reusable React components shared across pages. Split into custom app components and ui/ (shadcn primitives).
+components/ui/  shadcn/ui component library — 40+ headless UI primitives built on Radix UI.
+hooks/          Custom React hooks for auth state, user profile, mobile detection, and toasts.
+lib/            Core utilities — API client with endpoint definitions, user data normalization, and Tailwind merge helpers.
+public/         Static files served at root URL.
+styles/         Additional CSS files.
+
+================================================================
+CONFIGURATION
+================================================================
+
+Path Alias: @/* maps to ./* in tsconfig.json
+Dark Mode: html className="dark" (class-based, not media query)
+Domain: saksin.online (redirect configured in next.config.mjs)
+Font: Inter (Google Fonts via next/font)
+
+================================================================
+ENVIRONMENT VARIABLES
+================================================================
+
+NEXT_PUBLIC_API_URL              Main backend API base URL (default: http://localhost:8000)
+NEXT_PUBLIC_API_URL1             Chatbot "Get" service base URL (default: http://localhost:8005)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID     Google OAuth 2.0 Client ID
+
+================================================================
+GLOBAL CSS (globals.css)
+================================================================
+
+- Dark theme CSS variables (HSL-based color system)
+- Custom scrollbar styling
+- .glass class (glassmorphism effect)
+- .glow-emerald / .glow-blue (glow effects)
+- animate-float (floating animation)
+- animate-pulse-glow (pulsing glow animation)
+- Tailwind directives (@tailwind base, components, utilities)
+
+================================================================
+PAGE ROUTING MAP
+================================================================
+
+Landing (/)
+├── /login ←──────────────→ /signup
+│   ├── /forgot-password ──→ /reset-password ──→ /login
+│   └── on success ────────→ /dashboard
+│
+├── /dashboard (protected)
+│   ├── → /roles ──→ /interview/[role] ──→ /feedback
+│   ├── → /insights
+│   ├── → /profile (protected)
+│   └── → /subscription → /pricing
+│
+├── /pricing
+│   └── → /signup
+│
+└── /roles
+    └── → /interview/[role]
+        └── → /feedback
+
+================================================================
+COMPLETE PAGE LIST
+================================================================
+
+Route                File                              Auth Required   Description
+/                    app/page.tsx                       No              Landing page — hero, features, testimonials, stats, CTA, footer
+/login               app/login/page.tsx                 No              Email/password login + Google OAuth + OTP verification
+/signup              app/signup/page.tsx                 No              Registration with username, email, password + OTP + Google OAuth
+/forgot-password     app/forgot-password/page.tsx        No              Send OTP to email, then reset password with OTP + new password
+/reset-password      app/reset-password/page.tsx         No              OTP + new password form for password reset
+/dashboard           app/dashboard/page.tsx              Yes             Main dashboard — stats, recent sessions, upcoming sessions, progress
+/roles               app/roles/page.tsx                  No              Role selection grid (SDE, PM, Analyst, Consultant, Designer, DevOps)
+/interview/[role]    app/interview/[role]/page.tsx        Yes             Live interview — setup config then Q&A with AI, camera, timer
+/feedback            app/feedback/page.tsx                No              Post-interview feedback — timeline, scores, AI analysis per question
+/insights            app/insights/page.tsx                No              Performance analytics — trends, skills breakdown, weekly activity
+/profile             app/profile/page.tsx                 Yes             User profile — view/edit profile, avatar upload, achievements
+/pricing             app/pricing/page.tsx                 No              Pricing plans (Free, Pro, Enterprise) with FAQ section
+/subscription        app/subscription/page.tsx            No              Subscription management — current plan, usage, billing history

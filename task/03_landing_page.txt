@@ -1,0 +1,116 @@
+================================================================
+LANDING PAGE (/)
+================================================================
+
+File: app/page.tsx (453 lines)
+Route: /
+Auth Required: No
+Type: Client component ("use client")
+
+================================================================
+DESCRIPTION
+================================================================
+
+The main public-facing landing page for SakSin AI. Displays information about
+the platform with a hero section, feature showcase, social proof, and CTA.
+
+If the user is already authenticated (checked via useAuth hook), the landing
+content is replaced with the AuthStatus component showing quick links to
+Dashboard/Profile.
+
+================================================================
+SECTIONS ON PAGE
+================================================================
+
+1. HERO SECTION
+   - Headline: "Master Your Next AI Interview"
+   - Subtext explaining the AI interview platform
+   - CTA buttons: "Start Free Trial" → /dashboard, "Watch Demo"
+   - Animated gradient background
+
+2. STATS BAR (4 cards)
+   - Static numbers (e.g., "10,000+ Users", "95% Success Rate", etc.)
+
+3. COMPANY SHOWCASE
+   - 8 company logos (marquee/grid display)
+   - Social proof section
+
+4. FEATURES GRID (6 feature cards)
+   - Each card has an icon, title, description
+   - Features: AI Interviews, Real-Time Feedback, Multiple Roles, etc.
+
+5. TESTIMONIALS CAROUSEL
+   - User testimonials with avatars, names, roles
+   - Auto-rotating or swipeable carousel
+
+6. CTA SECTION
+   - Final call-to-action banner
+   - "Start Your Journey" → /signup
+
+7. FOOTER
+   - Links: Product, Resources, Company sections
+   - Social media links
+   - Copyright notice
+
+================================================================
+COMPONENTS USED
+================================================================
+
+Custom Components:
+- Header (components/header.tsx) — public navigation header
+- AuthStatus (components/auth-status.tsx) — shown when authenticated
+
+UI Components:
+- Button
+- Card, CardContent
+
+Hooks:
+- useAuth (isAuthenticated check)
+
+Libraries:
+- framer-motion (motion.div, AnimatePresence for animations)
+- lucide-react (icons)
+- next/link (navigation)
+
+================================================================
+API CALLS
+================================================================
+
+None — this is a static page. No backend data fetching.
+
+================================================================
+UI WIREFRAME
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ Header                                                    │
+│ ┌──────────────────────────────────────────────────────┐ │
+│ │ Logo | Features | Pricing | Success Stories | About  │ │
+│ │ Sign In | Get Started                                │ │
+│ └──────────────────────────────────────────────────────┘ │
+│                                                          │
+│ ┌──────────────────────────────────────────────────────┐ │
+│ │ Hero Section                                         │ │
+│ │ "Master Your Next AI Interview"                      │ │
+│ │ [Start Free Trial → /dashboard] [Watch Demo]         │ │
+│ └──────────────────────────────────────────────────────┘ │
+│                                                          │
+│ Stats (4 cards) → Companies (8 logos)                    │
+│                                                          │
+│ Features (6 cards) → Testimonials (carousel)             │
+│                                                          │
+│ CTA Section → Footer                                     │
+│                                                          │
+│ Auth Check: useAuth → if authenticated, shows AuthStatus │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+CONDITIONAL BEHAVIOR
+================================================================
+
+if (isAuthenticated) {
+  // Show AuthStatus component instead of landing content
+  // AuthStatus has links to Dashboard, Profile, Logout
+} else {
+  // Show full landing page
+}

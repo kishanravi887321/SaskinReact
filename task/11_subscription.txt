@@ -1,0 +1,123 @@
+================================================================
+SUBSCRIPTION PAGE (/subscription)
+================================================================
+
+File: app/subscription/page.tsx
+Route: /subscription
+Auth Required: No (but shows authenticated-style layout)
+Type: Client component ("use client")
+
+================================================================
+DESCRIPTION
+================================================================
+
+Subscription management page showing current plan details, usage analytics,
+billing history, and quick action links. Uses the SubscriptionStatus widget
+in the sidebar.
+
+NOTE: Currently uses HARDCODED MOCK DATA — not connected to payment or
+subscription API endpoints.
+
+================================================================
+PAGE SECTIONS
+================================================================
+
+1. CURRENT PLAN CARD
+   - Plan name: Pro Plan
+   - Price: $29/mo
+   - Status badge: [Active]
+   - Next billing date: Feb 15, 2024
+   - Features: Unlimited Sessions, 24/7 Support, Advanced AI Analytics
+   - Buttons: "Upgrade" → /pricing, "Manage"
+
+2. USAGE ANALYTICS
+   - Monthly usage data:
+     - Jan: 12 sessions, 85% avg score
+     - Feb: 18 sessions, 88% avg score
+     - (more months)
+
+3. BILLING HISTORY
+   - List of past invoices:
+     - 2024-01-15: $29 Pro Monthly [Paid] [Download]
+     - 2023-12-15: $29 Pro Monthly [Paid] [Download]
+     - 2023-11-15: $29 Pro Monthly [Paid] [Download]
+
+4. SIDEBAR
+   - SubscriptionStatus widget (showing plan tier, usage, billing)
+   - Quick Actions:
+     - Update Payment Method
+     - Download All Invoices
+     - Change Billing Cycle
+     - Cancel Subscription
+   - "Need Help?" → Contact Support link
+
+================================================================
+COMPONENTS USED
+================================================================
+
+Custom Components:
+- DashboardHeader (authenticated navigation header)
+- SubscriptionStatus (subscription plan widget)
+
+UI Components:
+- Card, CardContent, CardHeader, CardTitle
+- Button
+- Badge (plan status)
+- Progress (usage bars)
+- DropdownMenu + items
+
+Libraries:
+- framer-motion (animations)
+- lucide-react (icons)
+
+================================================================
+API CALLS
+================================================================
+
+NONE — uses static mock data.
+
+TODO: Should integrate with subscription/payment API endpoints such as:
+- GET /api/users/subscription/ (current plan)
+- GET /api/users/billing/history/ (billing history)
+- POST /api/users/subscription/upgrade/ (plan upgrade)
+- POST /api/users/subscription/cancel/ (cancellation)
+
+================================================================
+UI WIREFRAME
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ DashboardHeader                                          │
+├──────────────────────────────────────────────────────────┤
+│ "Subscription & Billing"                                 │
+│                                                          │
+│ ┌─ Current Plan ───────────────┐ ┌─ Sidebar ──────────┐ │
+│ │ ⚡ Pro Plan — $29/mo         │ │ SubscriptionStatus  │ │
+│ │ [Active] Next: Feb 15, 2024  │ │ widget             │ │
+│ │                              │ │                    │ │
+│ │ ∞ Sessions | 24/7 Support    │ │ Quick Actions:     │ │
+│ │ Advanced AI Analytics        │ │ - Update Payment   │ │
+│ │                              │ │ - Download Invoices│ │
+│ │ [Upgrade → /pricing] [Manage]│ │ - Change Billing   │ │
+│ └──────────────────────────────┘ │ - Cancel Sub       │ │
+│                                  │                    │ │
+│ ┌─ Usage Analytics ────────────┐ │ Need Help?         │ │
+│ │ Jan: 12 sess, 85% avg       │ │ [Contact Support]  │ │
+│ │ Feb: 18 sess, 88% avg       │ └────────────────────┘ │
+│ │ ...                          │                        │
+│ └──────────────────────────────┘                        │
+│                                                          │
+│ ┌─ Billing History ────────────┐                        │
+│ │ 2024-01-15: $29 Pro [Paid] ↓│                        │
+│ │ 2023-12-15: $29 Pro [Paid] ↓│                        │
+│ │ 2023-11-15: $29 Pro [Paid] ↓│                        │
+│ └──────────────────────────────┘                        │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+NAVIGATION
+================================================================
+
+- DashboardHeader links (Dashboard, Practice, Insights, Profile)
+- "Upgrade" → /pricing
+- Quick action buttons (not yet functional)

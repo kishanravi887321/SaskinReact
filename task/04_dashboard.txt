@@ -1,0 +1,113 @@
+================================================================
+DASHBOARD PAGE (/dashboard)
+================================================================
+
+File: app/dashboard/page.tsx
+Loading: app/dashboard/loading.tsx (returns null)
+Route: /dashboard
+Auth Required: YES (wrapped in ProtectedRoute)
+Type: Client component ("use client")
+
+================================================================
+DESCRIPTION
+================================================================
+
+The main authenticated dashboard showing user stats, recent interview sessions,
+upcoming sessions, progress tracking, and subscription status. This is the
+first page users see after logging in.
+
+================================================================
+DATA SOURCES
+================================================================
+
+LIVE API DATA:
+- User profile via useUser hook → getUserProfile() → GET /api/users/profile/
+- Display name via normalizeUserData() + getDisplayName() from user-utils
+
+MOCK/HARDCODED DATA (not connected to API):
+- Quick stats (Total Sessions: 24, Avg Score: 86, Practice Time: 18h, Success Rate: 94%)
+- Recent sessions list (4 sessions with role, type, score, date)
+- Upcoming sessions (2 scheduled sessions)
+- Progress bars (Interview Skills: 86%, Technical Knowledge: 78%, Communication: 92%)
+
+================================================================
+COMPONENTS USED
+================================================================
+
+Custom Components:
+- ProtectedRoute (wraps entire page — auth guard)
+- DashboardHeader (authenticated navigation header)
+- SubscriptionStatus (subscription widget in sidebar)
+
+UI Components:
+- Card, CardContent, CardHeader, CardTitle
+- Button
+- Progress
+- DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+
+Hooks:
+- useUser (user profile data)
+
+Libraries:
+- normalizeUserData, getDisplayName from lib/user-utils
+- framer-motion (animations)
+- lucide-react (icons)
+- next/link (navigation)
+
+================================================================
+API CALLS
+================================================================
+
+getUserProfile() via useUser hook
+  → GET /api/users/profile/ (with Bearer token)
+  → Returns user profile for displaying welcome message's display name
+
+================================================================
+UI WIREFRAME
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ DashboardHeader (logo, nav, search, notifications, user) │
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│ Welcome back, {displayName}! 👋                          │
+│ [Start Practice → /roles] [Study Guide]                  │
+│                                                          │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐    │
+│ │Total Sess│ │Avg Score │ │Time Pract│ │Success   │    │
+│ │    24    │ │    86    │ │   18h    │ │   94%    │    │
+│ └──────────┘ └──────────┘ └──────────┘ └──────────┘    │
+│                                                          │
+│ ┌─ Recent Sessions ──────────┐ ┌─ Sidebar ─────────┐   │
+│ │ [Search] [Filter dropdown] │ │ Upcoming Sessions  │   │
+│ │ 💻 Software Eng. 85/100   │ │ ⚙️ Sr. SWE Netflix │   │
+│ │ 📱 Product Mgr.  78/100   │ │ 👥 Tech Lead Spotify│   │
+│ │ 📊 Data Analyst  92/100   │ │ [Schedule New]     │   │
+│ │ 🎨 UX Designer  88/100   │ │                    │   │
+│ │ [View All Sessions]       │ │ Your Progress      │   │
+│ └───────────────────────────┘ │ Interview: 86%     │   │
+│                               │ Technical: 78%     │   │
+│                               │ Communication: 92% │   │
+│                               │                    │   │
+│                               │ Quick Actions      │   │
+│                               │ → /roles           │   │
+│                               │ → /insights        │   │
+│                               │ → /profile         │   │
+│                               │                    │   │
+│                               │ SubscriptionStatus │   │
+│                               │ Free Plan 3/5 used │   │
+│                               └────────────────────┘   │
+│                                                          │
+│ Protected: ProtectedRoute wraps entire page              │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+NAVIGATION LINKS FROM DASHBOARD
+================================================================
+
+- "Start Practice" → /roles
+- Recent session cards → (no link defined yet)
+- Quick Action: "New Interview" → /roles
+- Quick Action: "View Insights" → /insights
+- Quick Action: "Edit Profile" → /profile
+- SubscriptionStatus "Upgrade" → /pricing

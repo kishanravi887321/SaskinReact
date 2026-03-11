@@ -1,0 +1,127 @@
+================================================================
+FEEDBACK PAGE (/feedback)
+================================================================
+
+File: app/feedback/page.tsx
+Route: /feedback
+Auth Required: No
+Type: Client component ("use client")
+
+================================================================
+DESCRIPTION
+================================================================
+
+Post-interview feedback page showing detailed performance analysis. Displays
+a timeline of each interview question with scores, AI-generated feedback,
+and an overall stats sidebar.
+
+NOTE: Currently uses HARDCODED MOCK DATA — not connected to any backend API.
+This page needs to be wired up to receive actual interview session results.
+
+================================================================
+KEY FEATURES
+================================================================
+
+1. PERFORMANCE TIMELINE
+   - Chronological list of interview questions
+   - Each entry shows: timestamp, emotion emoji, question text, score (progress bar), AI feedback
+   - AI feedback uses typewriter animation effect
+
+2. PER-QUESTION SCORES
+   - Score out of 100 for each question
+   - Visual progress bar
+
+3. AI FEEDBACK
+   - Typewriter animation for AI commentary
+   - Strengths and improvement areas highlighted
+
+4. OVERALL STATS SIDEBAR
+   - Overall score
+   - Total time taken
+   - Strongest area
+   - Area to improve
+   - Action buttons: "Practice More", "Share Results"
+
+================================================================
+MOCK DATA STRUCTURE
+================================================================
+
+The following data is hardcoded (needs API connection):
+
+feedbackData: [
+  {
+    question: string,
+    answer: string,
+    score: number,
+    feedback: string,
+    emotion: string,
+    timestamp: string,
+    strengths: string[],
+    improvements: string[]
+  },
+  ...
+]
+
+overallStats: {
+  totalScore: number,
+  timeElapsed: string,
+  strongestArea: string,
+  improvementArea: string
+}
+
+================================================================
+COMPONENTS USED
+================================================================
+
+UI Components:
+- Card, CardContent
+- Button
+- Progress
+
+Libraries:
+- framer-motion (animations)
+- lucide-react (icons)
+
+================================================================
+API CALLS
+================================================================
+
+NONE — uses static mock data.
+
+TODO: Should fetch interview session results from backend. Possible approach:
+- Accept session_id via query params or route params
+- Fetch results from API endpoint (e.g., GET /api/central/v1/interview/results/{session_id})
+
+================================================================
+UI WIREFRAME
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ ← Back to Roles         InterviewAI    [Download] [Retake]│
+├──────────────────────────────────────────────────────────┤
+│                                                          │
+│ "Interview Feedback"                                     │
+│                                                          │
+│ ┌─ Performance Timeline ────────────┐ ┌─ Stats ───────┐ │
+│ │ ① 0:00 - 2:30 😊                 │ │ Overall: 82   │ │
+│ │   Q: "Tell me about yourself..."  │ │ Time: 12:00   │ │
+│ │   Score: 85/100 ██████████░       │ │ Strong: Prob  │ │
+│ │   AI: "Great introduction!..."    │ │   Solving     │ │
+│ │                                   │ │ Improve: Sys  │ │
+│ │ ② 2:30 - 5:15 🤔                 │ │   Design      │ │
+│ │   Q: "Describe a challenge..."    │ │               │ │
+│ │   Score: 78/100 ████████░░        │ │ [Practice     │ │
+│ │   AI: "Good use of STAR..."       │ │  More]        │ │
+│ │                                   │ │ [Share        │ │
+│ │ ③ ... (5 questions total)         │ │  Results]     │ │
+│ └───────────────────────────────────┘ └───────────────┘ │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+NAVIGATION
+================================================================
+
+- ← Back to Roles → /roles
+- "Retake" button (destination TBD)
+- "Download" button (download results — TBD implementation)
+- "Practice More" → /roles

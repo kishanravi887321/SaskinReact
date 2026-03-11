@@ -1,0 +1,162 @@
+================================================================
+CHATBOT WIDGET
+================================================================
+
+File: components/chatbot.tsx (722 lines)
+Type: Client component ("use client")
+Props: None
+Used In: LayoutWrapper (shown on ALL pages when user is authenticated)
+
+================================================================
+DESCRIPTION
+================================================================
+
+A floating, draggable chatbot widget that appears on every page for
+authenticated users. Has two modes/tabs: "Get" (query information about
+a user by email) and "Feed" (submit content to the AI and receive an API key).
+
+================================================================
+CHATBOT API ENDPOINTS
+================================================================
+
+1. POST {NEXT_PUBLIC_API_URL1}/chat/get/
+   Auth: Bearer Token (accessToken from localStorage)
+   Used In: Chatbot "Get" tab
+   Base URL: NEXT_PUBLIC_API_URL1 (default: http://localhost:8005) — DIFFERENT from main API
+   Request: {
+     email: string,
+     query: string,
+     timestamp: string (ISO)
+   }
+   Response: {
+     response | answer | text | message: string
+   }
+   Notes: Response field name varies — code checks: response, answer, text, message
+
+2. POST {NEXT_PUBLIC_API_URL}/api/users/chat/feed/
+   Auth: Bearer Token
+   Used In: Chatbot "Feed" tab
+   Base URL: NEXT_PUBLIC_API_URL (main API, default: http://localhost:8000)
+
+   New Feed Request: {
+     content: string,
+     timestamp: string (ISO)
+   }
+
+   Refeed Request: {
+     content: string,
+     api_key: string,
+     refeed: true,
+     timestamp: string (ISO)
+   }
+
+   Response: {
+     api_key: string,
+     message?: string,
+     status?: string
+   }
+
+================================================================
+"GET" MODE
+================================================================
+
+1. User enters an email address (the person to query about)
+2. User types a chat query/question
+3. POST to {API_URL1}/chat/get/ with { email, query, timestamp }
+4. Display response in chat bubble
+5. Conversation history maintained in component state
+
+================================================================
+"FEED" MODE
+================================================================
+
+Two sub-modes:
+
+1. NEW FEED:
+   - User enters content text
+   - POST to /api/users/chat/feed/ with { content, timestamp }
+   - Response includes api_key
+   - API key is stored and displayed to user
+
+2. REFEED (with existing API key):
+   - User enters API key for verification
+   - User enters new content
+   - POST to /api/users/chat/feed/ with { content, api_key, refeed: true, timestamp }
+   - Allows updating/adding to existing feed
+
+================================================================
+UI FEATURES
+================================================================
+
+- Floating widget (fixed position on screen)
+- Draggable (can be repositioned by user)
+- Minimize/Maximize/Close controls
+- Tab switching: "Get" and "Feed"
+- Chat-style message display
+- Text input area
+- Loading states during API calls
+- Error handling with user-friendly messages
+
+================================================================
+COMPONENTS USED
+================================================================
+
+UI Components:
+- Button
+- Textarea
+- Card
+- Badge
+
+Libraries:
+- lucide-react (icons)
+
+================================================================
+STATE MANAGEMENT
+================================================================
+
+Key state:
+- activeTab: "get" | "feed"
+- isOpen: boolean (widget visibility)
+- isMinimized: boolean
+- chatMessages: Array (conversation history)
+- email: string (for Get mode)
+- query/content: string (input text)
+- apiKey: string (from Feed response)
+- isRefeedMode: boolean
+- position: { x, y } (draggable position)
+- isLoading: boolean
+
+================================================================
+UI WIREFRAME
+================================================================
+
+┌──────────────────────────────────┐
+│ 💬 Chatbot (draggable)           │
+│ [Get] [Feed] tabs       [─][□][×]│
+├──────────────────────────────────┤
+│                                  │
+│ GET MODE:                        │
+│ > Enter email of person          │
+│ > Chat messages history          │
+│ > Type query                     │
+│ > [Send]                         │
+│                                  │
+│ FEED MODE:                       │
+│ > Enter content to feed          │
+│ > [New Feed] or [Refeed w/ key]  │
+│ > API key display on success     │
+│ > [Send]                         │
+│                                  │
+│ [Input area] [Send]              │
+└──────────────────────────────────┘
+
+================================================================
+IMPORTANT NOTES
+================================================================
+
+- The "Get" endpoint uses a SEPARATE backend service (API_URL1, port 8005)
+  from the main API (API_URL, port 8000)
+- The "Feed" endpoint uses the main API
+- Bearer token is always sent from localStorage accessToken
+- The widget only renders when useAuth().isAuthenticated is true
+  (checked in LayoutWrapper parent component)

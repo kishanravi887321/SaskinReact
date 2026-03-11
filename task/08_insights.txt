@@ -1,0 +1,159 @@
+================================================================
+INSIGHTS PAGE (/insights)
+================================================================
+
+File: app/insights/page.tsx
+Route: /insights
+Auth Required: No
+Type: Client component ("use client")
+
+================================================================
+DESCRIPTION
+================================================================
+
+Performance analytics dashboard showing interview trends, skills breakdown,
+company-specific performance, AI-generated insights, and weekly activity.
+
+NOTE: Currently uses HARDCODED MOCK DATA — not connected to any backend API.
+All analytics data is static.
+
+================================================================
+SECTIONS ON PAGE
+================================================================
+
+1. STATS BAR (4 cards)
+   - Average Score: 86%
+   - Total Sessions: 24
+   - Practice Hours: 18h
+   - Success Rate: 94%
+
+2. PERFORMANCE TREND (chart area)
+   - Monthly data: score trends over 6 months
+   - Number of sessions per month
+   - Visual line/bar chart
+
+3. AI INSIGHTS (4 insight cards)
+   - Communication improvement: +15%
+   - Focus area suggestion: System Design
+   - Streak tracker: 7-day streak
+   - Readiness assessment: "Ready for advanced"
+
+4. SKILLS ANALYSIS
+   - Technical: 85% ↑
+   - Communication: 92% ↑
+   - Problem Solving: 78% ↓
+   - Leadership: 88% ↑
+   - System Design: 75% ↑
+   - Behavioral: 90% ↑
+   - Each with progress bar and trend arrow
+
+5. COMPANY PERFORMANCE
+   - Google: 8 sessions, 85% average
+   - Meta: 6 sessions, 78% average
+   - Amazon: 5 sessions, 92% average
+
+6. WEEKLY ACTIVITY
+   - Day-by-day breakdown: sessions count and average score
+   - Mon through Sun
+
+7. QUICK ACTIONS SIDEBAR
+   - Focus on Weak Areas
+   - Detailed Report
+   - Share Progress
+
+================================================================
+MOCK DATA STRUCTURES
+================================================================
+
+performanceData: [
+  { month: string, score: number, sessions: number },
+  ...
+]
+
+skillBreakdown: [
+  { skill: string, score: number, trend: "up" | "down", change: number },
+  ...
+]
+
+companyInsights: [
+  { company: string, sessions: number, avgScore: number, trend: "up" | "down" },
+  ...
+]
+
+weeklyActivity: [
+  { day: string, sessions: number, avgScore: number },
+  ...
+]
+
+================================================================
+COMPONENTS USED
+================================================================
+
+Custom Components:
+- DashboardHeader (authenticated navigation header)
+
+UI Components:
+- Card, CardContent, CardHeader, CardTitle
+- Button
+- Progress
+- DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+
+Libraries:
+- framer-motion (animations)
+- lucide-react (icons)
+
+================================================================
+API CALLS
+================================================================
+
+NONE — uses static mock data.
+
+TODO: Should fetch analytics from backend API endpoints such as:
+- GET /api/central/v1/analytics/performance/
+- GET /api/central/v1/analytics/skills/
+- GET /api/central/v1/analytics/activity/
+
+================================================================
+UI WIREFRAME
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ DashboardHeader                                          │
+├──────────────────────────────────────────────────────────┤
+│ Performance Insights          [Last 30 days ▼] [Export]  │
+│                                                          │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐    │
+│ │Avg Score │ │Total Sess│ │Practice  │ │Success   │    │
+│ │   86%    │ │    24    │ │   18h    │ │   94%    │    │
+│ └──────────┘ └──────────┘ └──────────┘ └──────────┘    │
+│                                                          │
+│ ┌─ Performance Trend ──────────┐ ┌─ AI Insights ──────┐ │
+│ │ Jan: 72% (8 sessions)       │ │ 🗣️ Communication +15%│ │
+│ │ Feb: 78% (12 sessions)      │ │ ⚙️ Focus: Sys Design │ │
+│ │ Mar: 85% (15 sessions)      │ │ 🔥 7-day streak!     │ │
+│ │ ...                         │ │ 🎯 Ready for advanced │ │
+│ └─────────────────────────────┘ └─────────────────────┘ │
+│                                                          │
+│ ┌─ Skills Analysis ───────────┐ ┌─ Weekly Activity ───┐ │
+│ │ Technical: 85% ↑            │ │ Mon: 2 sessions 85% │ │
+│ │ Communication: 92% ↑        │ │ Tue: 1 session 78%  │ │
+│ │ Problem Solving: 78% ↓      │ │ Wed: 3 sessions 92% │ │
+│ │ Leadership: 88% ↑           │ │ ...                 │ │
+│ │ System Design: 75% ↑        │ └─────────────────────┘ │
+│ │ Behavioral: 90% ↑           │                         │
+│ └─────────────────────────────┘ ┌─ Quick Actions ─────┐ │
+│                                 │ Focus on Weak Areas  │ │
+│ ┌─ Company Performance ───────┐ │ Detailed Report      │ │
+│ │ Google: 8 sess, 85% avg    │ │ Share Progress       │ │
+│ │ Meta: 6 sess, 78% avg      │ └─────────────────────┘ │
+│ │ Amazon: 5 sess, 92% avg    │                         │
+│ └─────────────────────────────┘                         │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+NAVIGATION
+================================================================
+
+- DashboardHeader links (Dashboard, Practice, Insights, Profile)
+- Filter dropdown: "Last 30 days" (time range selector, not functional)
+- Export button (not functional)

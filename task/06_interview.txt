@@ -1,0 +1,238 @@
+================================================================
+LIVE INTERVIEW PAGE (/interview/[role])
+================================================================
+
+File: app/interview/[role]/page.tsx (1008 lines)
+Route: /interview/:role (dynamic route)
+Auth Required: YES (manual check, not ProtectedRoute wrapper)
+Type: Client component ("use client")
+
+================================================================
+DESCRIPTION
+================================================================
+
+A two-phase interview page. Phase 1 lets users configure their interview
+settings. Phase 2 runs a live AI-powered Q&A session with webcam, audio,
+timer, and real-time feedback.
+
+================================================================
+PHASE 1: INTERVIEW SETUP
+================================================================
+
+Configuration fields:
+- Interview Type: Select dropdown (technical, behavioral, mixed, case_study, system_design)
+- Difficulty: Select dropdown (beginner, intermediate, advanced, expert)
+- Duration: Select dropdown (30, 45, 60, 90 minutes)
+- Experience: Text input (years or level)
+- Position: Text input (auto-filled from URL role parameter)
+- Industry: Text input
+- Skills: Tag input with suggestions (add/remove skills)
+- Custom Questions: Optional, add custom questions list
+
+On submit → calls startInterview() API
+
+================================================================
+PHASE 2: LIVE INTERVIEW
+================================================================
+
+Features:
+- AI question displayed with typewriter effect (character-by-character animation)
+- Webcam video feed via navigator.mediaDevices.getUserMedia()
+- Video on/off toggle
+- Microphone on/off toggle
+- Countdown timer (tracks total elapsed time)
+- Current score display
+- Emotion tracking simulation (Confident, Nervous, etc.)
+- Progress indicator (current question / total questions)
+- Text answer textarea
+- Question history (collapsible list of previous Q&As with scores)
+
+User flow:
+1. Read AI question (typewriter animation)
+2. Type answer in textarea
+3. Click "Submit Answer" → calls submitAnswer() API
+4. Receive feedback (score, strengths, improvements) + next question
+5. Repeat until all questions answered
+6. On completion → redirect to /feedback
+
+================================================================
+INTERVIEW API ENDPOINTS
+================================================================
+
+1. POST /api/central/v1/interview/start/
+   Auth: Bearer Token
+   Request: {
+     role: string,
+     interview_type: "technical" | "behavioral" | "mixed" | "case_study" | "system_design",
+     difficulty: "beginner" | "intermediate" | "advanced" | "expert",
+     duration_minutes: number,
+     experience: string,
+     position: string,
+     industry: string,
+     skills: string[],
+     custom_questions?: string[]
+   }
+   Response: {
+     status: string,
+     session_id: string,
+     question: string,
+     progress: {
+       current_question: number,
+       total_questions: number
+     },
+     session_info: object
+   }
+
+2. POST /api/central/v1/interview/answer/
+   Auth: Bearer Token
+   Request: {
+     session_id: string,
+     answer: string
+   }
+   Response: {
+     status: "continue" | "success",
+     next_question: string | null,
+     feedback: {
+       score: number,
+       feedback: string,
+       strengths: string[],
+       improvements: string[],
+       suggestions: string[],
+       overall_assessment: string
+     },
+     progress: {
+       current_question: number,
+       total_questions: number
+     }
+   }
+   Logic:
+   - If status === "continue" → display next_question
+   - If next_question is null → interview complete, redirect to /feedback
+
+3. POST /api/central/v1/interview/end/ (defined but not actively used)
+   Auth: Bearer Token
+   Request: { session_id: string }
+   Response: Interview summary
+
+================================================================
+TYPE DEFINITIONS (from lib/api.ts)
+================================================================
+
+InterviewConfig {
+  role: string
+  interview_type: string
+  difficulty: string
+  duration_minutes: number
+  experience: string
+  position: string
+  industry: string
+  skills: string[]
+  custom_questions?: string[]
+}
+
+InterviewSession {
+  session_id: string
+  question: string
+  progress: {
+    current_question: number
+    total_questions: number
+  }
+}
+
+================================================================
+COMPONENTS USED
+================================================================
+
+UI Components:
+- Card, CardContent, CardHeader, CardTitle
+- Button
+- Progress
+- Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+- Input, Label
+- Textarea
+- Badge
+- DropdownMenu + items
+- Avatar, AvatarFallback, AvatarImage
+
+Hooks:
+- useAuth (accessToken for API calls, redirect if not authenticated)
+- useUser (user data for avatar/name display)
+- useParams (get role from URL)
+- useRouter (navigation)
+
+Libraries:
+- startInterview(), submitAnswer() from lib/api.ts
+- framer-motion (animations)
+- lucide-react (icons)
+
+================================================================
+UI WIREFRAME — SETUP PHASE
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ ← Back to Roles    Interview Setup         [User Avatar] │
+├──────────────────────────────────────────────────────────┤
+│ ┌──────────────────────────────────────────────────────┐ │
+│ │ "Configure Your Interview Experience"                │ │
+│ │                                                      │ │
+│ │ Interview Type: [Select: technical/behavioral/...]   │ │
+│ │ Difficulty:     [Select: beginner/intermediate/...]   │ │
+│ │ Duration:       [Select: 30/45/60/90 min]            │ │
+│ │ Experience:     [Input: years/level]                  │ │
+│ │ Position:       [Input: auto-filled from role param] │ │
+│ │ Industry:       [Input]                              │ │
+│ │ Skills:         [Add skills from suggestions]        │ │
+│ │ Custom Qs:      [Add custom questions]               │ │
+│ │                                                      │ │
+│ │ [Start Interview]                                    │ │
+│ └──────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+UI WIREFRAME — INTERVIEW PHASE
+================================================================
+
+┌──────────────────────────────────────────────────────────┐
+│ Timer: 00:05:30    Progress: ██████░░░░ 3/10             │
+│ Score: 85          Emotion: 😊 Confident                 │
+├──────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────┐ ┌──────────────────────┐    │
+│ │ AI Question (typewriter) │ │ Camera Feed          │    │
+│ │                         │ │ [Video on/off]       │    │
+│ │ "Tell me about your..." │ │ [Mic on/off]         │    │
+│ │                         │ │ Emotion: 😊          │    │
+│ └─────────────────────────┘ └──────────────────────┘    │
+│                                                          │
+│ [Answer Textarea]                                        │
+│ [Submit Answer] [Skip] [End Interview]                   │
+│                                                          │
+│ ┌─ Previous Q&A History (collapsible) ─────────────────┐ │
+│ │ Q1: "..." → A: "..." → Score: 85                    │ │
+│ │ Q2: "..." → A: "..." → Score: 92                    │ │
+│ └──────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────┘
+
+================================================================
+INTERVIEW SESSION STATE
+================================================================
+
+Key state variables:
+- interviewPhase: "setup" | "interview"
+- sessionId: string (from start API response)
+- currentQuestion: string
+- answer: string (textarea value)
+- questionHistory: Array<{ question, answer, score, feedback }>
+- progress: { current_question, total_questions }
+- timer: elapsed seconds
+- score: cumulative score
+- isVideoOn: boolean
+- isAudioOn: boolean
+- emotion: string (simulated)
+
+================================================================
+NAVIGATION
+================================================================
+
+- ← Back to Roles → /roles
+- On interview completion → /feedback
+- Manual auth redirect: if no accessToken → /login

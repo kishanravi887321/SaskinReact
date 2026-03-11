@@ -1,0 +1,267 @@
+================================================================
+HOOKS & UTILITIES
+================================================================
+
+This file documents all custom hooks and utility libraries.
+
+================================================================
+HOOK: useAuth (hooks/use-auth.ts)
+================================================================
+
+Purpose: Authentication state management via localStorage JWT tokens.
+
+Returns:
+{
+  isAuthenticated: boolean       // true when accessToken exists in localStorage
+  isLoading: boolean             // true while checking initial auth state on mount
+  accessToken: string | null     // current JWT access token
+  login(accessToken: string, refreshToken?: string): void
+  logout(): void
+  getTokens(): { accessToken: string | null, refreshToken: string | null }
+}
+
+Behavior:
+- On mount: reads localStorage for 'accessToken', sets isAuthenticated
+- login(): stores accessToken (and optionally refreshToken) in localStorage
+- logout(): removes accessToken, refreshToken, username from localStorage
+- getTokens(): returns both tokens from localStorage
+- No token refresh logic implemented (no auto-refresh on expiry)
+
+Used In:
+- Login page (login function after successful auth)
+- Signup page (login function after Google OAuth)
+- Landing page (isAuthenticated check)
+- LayoutWrapper (isAuthenticated → show Chatbot)
+- ProtectedRoute (isAuthenticated → allow/redirect)
+- DashboardHeader (logout, accessToken)
+- Interview page (accessToken for API calls)
+- Profile page (accessToken for API calls)
+- AuthStatus (isAuthenticated, logout)
+
+================================================================
+HOOK: useUser (hooks/use-user.ts)
+================================================================
+
+Purpose: Fetch and cache user profile data when authenticated.
+
+Returns:
+{
+  user: UserProfile | null       // user profile object from API
+  isLoading: boolean             // true while fetching
+  error: string | null           // error message if fetch fails
+  refreshUser(): void            // manually re-fetch profile
+  clearUser(): void              // clear cached user data
+}
+
+Behavior:
+- On mount: if useAuth().isAuthenticated → calls getUserProfile() from lib/api.ts
+- getUserProfile() → GET /api/users/profile/ with Bearer token
+- Stores result in state
+- Re-fetches when isAuthenticated changes
+- clearUser(): sets user to null (used on logout)
+
+Used In:
+- Dashboard page (user display name)
+- DashboardHeader (user avatar, name, initials)
+- Interview page (user info display)
+
+Dependencies:
+- useAuth hook (isAuthenticated, accessToken)
+- getUserProfile() from lib/api.ts
+
+================================================================
+HOOK: use-mobile (hooks/use-mobile.tsx)
+================================================================
+
+Purpose: Detect mobile viewport for responsive behavior.
+
+Returns: boolean (true if viewport width < breakpoint)
+
+Used In: Available for components needing responsive logic.
+
+================================================================
+HOOK: use-toast (hooks/use-toast.ts)
+================================================================
+
+Purpose: Toast notification management.
+
+Returns: Toast state and trigger functions.
+
+Used In: Available for components needing toast notifications.
+
+================================================================
+UTILITY: lib/api.ts — API Client
+================================================================
+
+Purpose: Central API module with endpoint definitions, type definitions,
+and request helper functions.
+
+--- Environment Variables ---
+API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+
+--- API_ENDPOINTS Object ---
+{
+  interview: {
+    start:  "/api/central/v1/interview/start/",
+    answer: "/api/central/v1/interview/answer/",
+    end:    "/api/central/v1/interview/end/"
+  },
+  user: {
+    profile: "/api/users/profile/",
+    updateProfile: "/api/users/profile/update/"
+  }
+}
+
+--- Type Definitions ---
+
+InterviewConfig {
+  role: string
+  interview_type: string
+  difficulty: string
+  duration_minutes: number
+  experience: string
+  position: string
+  industry: string
+  skills: string[]
+  custom_questions?: string[]
+}
+
+UserProfile {
+  id: number
+  email: string
+  username: string
+  name?: string
+  role: string
+  bio: string
+  profile: string
+  photo?: string
+  date_joined: string
+  is_active: boolean
+}
+
+InterviewSession {
+  session_id: string
+  question: string
+  progress: {
+    current_question: number
+    total_questions: number
+  }
+}
+
+ApiResponse<T> {
+  status: string
+  data?: T
+  message?: string
+  error?: string
+}
+
+--- Functions ---
+
+apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T>
+  - Generic fetch wrapper
+  - Adds Bearer token from localStorage automatically
+  - Adds Content-Type: application/json header
+  - Throws on non-OK response
+
+startInterview(config: InterviewConfig): Promise<InterviewSession>
+  - POST to /api/central/v1/interview/start/
+  - Sends interview configuration
+  - Returns session details with first question
+
+submitAnswer(sessionId: string, answer: string): Promise<any>
+  - POST to /api/central/v1/interview/answer/
+  - Sends answer for current question
+  - Returns feedback + next question or completion status
+
+getUserProfile(): Promise<UserProfile>
+  - GET to /api/users/profile/
+  - Returns authenticated user's profile
+
+================================================================
+UTILITY: lib/user-utils.ts — User Data Normalization
+================================================================
+
+Purpose: Normalize varying API response shapes into a unified user profile format.
+
+--- UnifiedUserProfile Interface ---
+{
+  id: number
+  email: string
+  username: string
+  firstName: string
+  lastName: string
+  name: string
+  role: string
+  bio: string
+  profileImage: string
+  dateJoined: string
+  isActive: boolean
+  socialLinks: {
+    linkedin: string
+    github: string
+    twitter: string
+    website: string
+  }
+}
+
+--- Exported Functions ---
+
+normalizeUserData(data: any): UnifiedUserProfile
+  - Handles field mapping:
+    - first_name / firstName → firstName
+    - last_name / lastName → lastName
+    - profile / photo / profile_picture → profileImage
+    - date_joined / dateJoined → dateJoined
+    - is_active / isActive → isActive
+    - social_links / socialLinks → socialLinks
+
+getDisplayName(user: any): string
+  - Priority order: firstName+lastName → firstName → name → username → email prefix → "User"
+
+getUserInitials(user: any): string
+  - Extracts 1-2 character initials from available name fields
+  - Falls back to username first character, then "U"
+
+getProfileImage(user: any): string
+  - Priority: profile_picture → photo → profile → "/placeholder-user.jpg"
+
+Used In:
+- DashboardHeader (normalize + display name + initials + image)
+- Dashboard page (display name)
+- Profile page (profile data display)
+
+================================================================
+UTILITY: lib/utils.ts — General Utilities
+================================================================
+
+Purpose: Common utility functions used across the application.
+
+--- Exported Functions ---
+
+cn(...inputs: ClassValue[]): string
+  - Combines clsx() and twMerge() for Tailwind class merging
+  - Used in every shadcn/ui component for conditional class application
+
+getStoredTokens(): { accessToken: string | null, refreshToken: string | null }
+  - Reads tokens from localStorage
+
+clearStoredTokens(): void
+  - Removes accessToken, refreshToken, username from localStorage
+
+hasValidTokens(): boolean
+  - Returns true if accessToken exists in localStorage
+
+================================================================
+STATE MANAGEMENT OVERVIEW
+================================================================
+
+No global state management library (no Redux, Zustand, or Context for app state).
+
+Method              Where Used                  Purpose
+useState            Every page/component        Local component state
+useAuth hook        Auth state across pages      Token management via localStorage
+useUser hook        User data across pages       Profile fetching with auth dependency
+localStorage        Auth tokens, username        Persistent state across sessions
+useParams           Interview page               Dynamic route parameter ([role])
+useRouter           Login, Signup, Interview...  Programmatic navigation
+useSearchParams     (available, not actively used)
