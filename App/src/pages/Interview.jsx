@@ -107,9 +107,31 @@ export default function Interview() {
   // Real-time answer analysis
   useEffect(() => {
     if (answer && phase === 'interview') {
-      analyzeAnswerInRealTime(answer);
+      // AI-powered real-time analysis
+      const words = answer.split(' ').length;
+      const avgWordLength = answer.length / Math.max(words, 1);
+
+      // Simulate sentiment analysis
+      const positiveWords = ['excellent', 'great', 'successful', 'achieved', 'improved'];
+      const sentiment = positiveWords.some(word => answer.toLowerCase().includes(word))
+        ? 'positive' : 'neutral';
+
+      // Generate suggestions
+      const newSuggestions = [];
+      if (words < 20) {
+        newSuggestions.push('Try to elaborate more on your example');
+      }
+      if (avgWordLength < 4) {
+        newSuggestions.push('Use more technical terminology');
+      }
+      if (!answer.includes('I')) {
+        newSuggestions.push('Make it more personal - use specific examples');
+      }
+
+      setSuggestions(newSuggestions);
+      setRealTimeAnalysis(prev => ({ ...prev, sentiment }));
     }
-  }, [answer, phase, analyzeAnswerInRealTime]);
+  }, [answer, phase]);
 
   // Typewriter effect
   useEffect(() => {
@@ -168,56 +190,6 @@ export default function Interview() {
     }
   }, []);
 
-  // Voice Recognition Setup
-  const initVoiceRecognition = useCallback(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = 'en-US';
-
-      recognitionRef.current.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          if (event.results[i].isFinal) {
-            transcript += event.results[i][0].transcript;
-          }
-        }
-        if (transcript) {
-          setAnswer(prev => prev + ' ' + transcript);
-          analyzeAnswerInRealTime(transcript);
-        }
-      };
-    }
-  }, []);
-
-  const analyzeAnswerInRealTime = useCallback((text) => {
-    // AI-powered real-time analysis
-    const words = text.split(' ').length;
-    const avgWordLength = text.length / Math.max(words, 1);
-
-    // Simulate sentiment analysis
-    const positiveWords = ['excellent', 'great', 'successful', 'achieved', 'improved'];
-    const sentiment = positiveWords.some(word => text.toLowerCase().includes(word))
-      ? 'positive' : 'neutral';
-
-    // Generate suggestions
-    const newSuggestions = [];
-    if (words < 20) {
-      newSuggestions.push('Try to elaborate more on your example');
-    }
-    if (avgWordLength < 4) {
-      newSuggestions.push('Use more technical terminology');
-    }
-    if (!text.includes('I')) {
-      newSuggestions.push('Make it more personal - use specific examples');
-    }
-
-    setSuggestions(newSuggestions);
-    setRealTimeAnalysis(prev => ({ ...prev, sentiment }));
-  }, []);
-
   const generateAdvancedQuestion = useCallback(async () => {
     // AI-powered adaptive question generation
     const context = {
@@ -265,8 +237,26 @@ export default function Interview() {
 
   const toggleVoiceToText = useCallback(() => {
     if (!voiceToText) {
-      initVoiceRecognition();
-      if (recognitionRef.current) {
+      // Initialize voice recognition inline
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = true;
+        recognitionRef.current.lang = 'en-US';
+
+        recognitionRef.current.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              transcript += event.results[i][0].transcript;
+            }
+          }
+          if (transcript) {
+            setAnswer(prev => prev + ' ' + transcript);
+          }
+        };
+
         recognitionRef.current.start();
         setIsRecording(true);
       }
@@ -277,7 +267,7 @@ export default function Interview() {
       }
     }
     setVoiceToText(!voiceToText);
-  }, [voiceToText, initVoiceRecognition]);
+  }, [voiceToText]);
 
   const formatTime = (sec) => {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -329,7 +319,6 @@ Generate challenging but fair questions that assess both technical competency an
 
       // Initialize advanced features
       await initCamera();
-      initVoiceRecognition();
 
       // Set initial adaptive context
       setAdaptiveContext(prev => ({
