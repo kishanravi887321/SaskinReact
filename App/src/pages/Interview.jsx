@@ -5,7 +5,7 @@ import {
   ArrowLeft, Video, VideoOff, Mic, MicOff, Clock, Target, Send,
   ChevronDown, ChevronUp, Brain, Loader2, X, Sparkles, Plus, Settings,
   Activity, TrendingUp, Zap, Eye, Volume2, VolumeX, Headphones,
-  BarChart3, AlertCircle, CheckCircle, Star, Lightbulb,
+  BarChart3, AlertCircle, CheckCircle, Star, Lightbulb, Play, Pause,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -16,9 +16,20 @@ import { Label } from '../components/ui/Label';
 import { Textarea } from '../components/ui/Textarea';
 import { Select, SelectOption } from '../components/ui/Select';
 import { Avatar, AvatarImage, AvatarFallback } from '../components/ui/Avatar';
+import AudioRecorder from '../components/AudioRecorder';
+import AudioPlayer from '../components/AudioPlayer';
 import { useAuth } from '../hooks/useAuth';
 import { useUser } from '../hooks/useUser';
-import { startInterview, submitAnswer } from '../lib/api';
+import {
+  startInterview,
+  submitAnswer,
+  startAudioInterview,
+  submitAudioAnswer,
+  submitEnhancedAnswer,
+  processAudioWithFeedback,
+  generateAudioFromText,
+  downloadAudioFile
+} from '../lib/api';
 import { getUserInitials, getProfileImage } from '../lib/userUtils';
 
 const emotions = ['😊 Confident', '🤔 Thinking', '😰 Nervous', '💪 Determined', '😄 Relaxed'];
@@ -71,20 +82,215 @@ export default function Interview() {
   const [difficulty, setDifficulty] = useState('intermediate');
   const [interviewMode, setInterviewMode] = useState('standard');
 
+  // Audio Pipeline State
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [inputMode, setInputMode] = useState('text'); // 'text', 'audio', 'hybrid'
+  const [isProcessingAudio, setIsProcessingAudio] = useState(false);
+  const [audioResponse, setAudioResponse] = useState(null);
+  const [questionAudio, setQuestionAudio] = useState(null);
+  const [transcriptionData, setTranscriptionData] = useState({
+    text: '',
+    confidence: 0,
+    isLive: false,
+  });
+
+  // Real-time Audio Analytics
+  const [audioAnalytics, setAudioAnalytics] = useState({
+    recordingTime: 0,
+    audioLevels: [],
+    speechPace: 'normal', // slow, normal, fast
+    pauseCount: 0,
+    averageVolume: 0,
+  });
+
+  // Audio Playback State
+  const [isPlayingQuestion, setIsPlayingQuestion] = useState(false);
+  const [isPlayingFeedback, setIsPlayingFeedback] = useState(false);
+  const [audioSettings, setAudioSettings] = useState({
+    autoPlayQuestions: true,
+    autoPlayFeedback: true,
+    playbackSpeed: 1.0,
+    volume: 0.8,
+  });
+
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Advanced cleanup and initialization
-  useEffect(() => {
-    return () => {
-      // Cleanup all features
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (recognitionRef.current) recognitionRef.current.stop();
-      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+  // Audio Pipeline Callbacks
+  const handleRecordingComplete = useCallback(async (audioBlob, transcription, confidence) => {
+    setIsProcessingAudio(true);
+    setError('');
+
+    try {
+      // Update transcription data
+      setTranscriptionData({
+        text: transcription,
+        confidence,
+        isLive: false,
+      });
+
+      // If audio mode is enabled, process through audio pipeline
+      if (audioEnabled && inputMode !== 'text') {
+        const result = await processAudioWithFeedback(sessionId, audioBlob, {
+          transcription,
+          confidence,
+          duration: audioAnalytics.recordingTime,
+          audioLevels: audioAnalytics.audioLevels,
+          speechPace: audioAnalytics.speechPace,
+          pauseCount: audioAnalytics.pauseCount,
+          averageVolume: audioAnalytics.averageVolume,
+        });
+
+        // Handle audio pipeline response
+        await handleAudioPipelineResponse(result);
+      } else {
+        // Fallback to text submission
+        setAnswer(transcription);
+        await handleSubmitAnswer(transcription);
+      }
+    } catch (error) {
+      console.error('Error processing audio:', error);
+      setError(`Audio processing failed: ${error.message}`);
+      // Fallback to text mode
+      setAnswer(transcription);
+    } finally {
+      setIsProcessingAudio(false);
+    }
+  }, [sessionId, audioEnabled, inputMode, audioAnalytics]);
+
+  const handleTranscriptionUpdate = useCallback((transcription, confidence) => {
+    setTranscriptionData({
+      text: transcription,
+      confidence,
+      isLive: true,
+    });
+
+    // Auto-update answer if in hybrid mode
+    if (inputMode === 'hybrid') {
+      setAnswer(transcription);
+    }
+
+    // Generate live suggestions based on transcription
+    generateLiveSuggestions(transcription);
+  }, [inputMode]);
+
+  const handleAudioPipelineResponse = useCallback(async (result) => {
+    const {
+      transcription,
+      feedback,
+      next_question,
+      question_audio_url,
+      feedback_audio_url,
+      status,
+      progress: newProgress
+    } = result;
+
+    // Update question history with enhanced audio data
+    const enhancedHistory = {
+      question: currentQuestion,
+      answer: transcription || answer,
+      score: feedback?.score || 0,
+      feedback: feedback?.feedback || '',
+      strengths: feedback?.strengths || [],
+      improvements: feedback?.improvements || [],
+      timestamp: new Date().toISOString(),
+      questionType: questionType,
+      audioMetrics: audioAnalytics,
+      transcriptionConfidence: transcriptionData.confidence,
     };
-  }, []);
+
+    setQuestionHistory(prev => [...prev, enhancedHistory]);
+
+    // Update overall score
+    const allScores = [...questionHistory.map(q => q.score), feedback?.score || 0];
+    const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+    setScore(Math.round(avgScore));
+
+    // Handle feedback audio
+    if (feedback_audio_url && audioSettings.autoPlayFeedback) {
+      setAudioResponse(feedback_audio_url);
+      setIsPlayingFeedback(true);
+    }
+
+    if (status === 'continue' && next_question) {
+      // Set next question
+      setCurrentQuestion(next_question);
+      setProgress(newProgress || progress);
+      setAnswer('');
+      setSuggestions([]);
+      setTranscriptionData({ text: '', confidence: 0, isLive: false });
+
+      // Handle question audio
+      if (question_audio_url && audioSettings.autoPlayQuestions) {
+        setQuestionAudio(question_audio_url);
+        setIsPlayingQuestion(true);
+      }
+    } else {
+      // Interview completed
+      await cleanupInterview();
+      navigate('/feedback');
+    }
+  }, [
+    currentQuestion,
+    answer,
+    questionType,
+    audioAnalytics,
+    transcriptionData,
+    questionHistory,
+    audioSettings,
+    progress,
+    navigate
+  ]);
+
+  const generateLiveSuggestions = useCallback((text) => {
+    const words = text.split(' ').length;
+    const newSuggestions = [];
+
+    // Generate context-aware suggestions
+    if (words < 10) {
+      newSuggestions.push('🎯 Provide more specific details about your experience');
+    }
+
+    if (words > 5 && !text.toLowerCase().includes('i ')) {
+      newSuggestions.push('💡 Make it personal - share your direct involvement');
+    }
+
+    if (words > 20 && !text.includes('because') && !text.includes('since')) {
+      newSuggestions.push('🔍 Explain your reasoning and decision-making process');
+    }
+
+    if (questionType === 'technical' && words > 15 && !text.toLowerCase().includes('system') && !text.toLowerCase().includes('architecture')) {
+      newSuggestions.push('🏗️ Discuss system design and technical architecture');
+    }
+
+    if (questionType === 'behavioral' && words > 10 && !text.toLowerCase().includes('result') && !text.toLowerCase().includes('outcome')) {
+      newSuggestions.push('📊 Share the results and impact of your actions');
+    }
+
+    setSuggestions(newSuggestions.slice(0, 3));
+  }, [questionType]);
+
+  const cleanupInterview = useCallback(async () => {
+    // Stop all audio and recording
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    if (recognitionRef.current) recognitionRef.current.stop();
+
+    // Cleanup audio resources
+    setAudioResponse(null);
+    setQuestionAudio(null);
+    setIsPlayingQuestion(false);
+    setIsPlayingFeedback(false);
+
+    // Optional: Cleanup server-side session
+    try {
+      // await cleanupInterviewSession(sessionId);
+    } catch (error) {
+      console.warn('Session cleanup failed:', error);
+    }
+  }, [sessionId]);
 
   // Smart answer suggestions
   useEffect(() => {
@@ -235,10 +441,19 @@ export default function Interview() {
     setLoading(true);
     setError('');
     try {
-      // Use advanced AI prompting
+      // Enhanced AI prompting with audio support
       const enhancedConfig = {
         ...config,
         role,
+        // Audio Pipeline Configuration
+        audioEnabled: inputMode !== 'text',
+        inputMode,
+        audioSettings,
+        generateQuestionAudio: inputMode !== 'text' && audioSettings.autoPlayQuestions,
+        generateFeedbackAudio: inputMode !== 'text' && audioSettings.autoPlayFeedback,
+        transcriptionEnabled: inputMode !== 'text',
+        realTimeAnalysis: true,
+
         ai_prompt: `You are an expert ${role} interviewer conducting a real-world professional interview.
 
 Guidelines:
@@ -248,15 +463,22 @@ Guidelines:
 - Adapt difficulty based on candidate responses
 - Evaluate technical depth, communication clarity, and problem-solving approach
 - Ask relevant follow-up questions when answers lack depth
+${inputMode !== 'text' ? '- Optimize responses for audio delivery with natural speech patterns' : ''}
+${inputMode !== 'text' ? '- Provide verbal feedback that sounds natural when spoken aloud' : ''}
 
 Current Context: ${config.interview_type} interview for ${role} role
 Experience Level: ${config.experience}
 Skills Focus: ${config.skills.join(', ')}
+Interview Mode: ${inputMode}
 
 Generate challenging but fair questions that assess both technical competency and leadership potential.`,
       };
 
-      const data = await startInterview(enhancedConfig);
+      // Use audio-enabled interview API if audio features are enabled
+      const data = inputMode !== 'text'
+        ? await startAudioInterview(enhancedConfig)
+        : await startInterview(enhancedConfig);
+
       setSessionId(data.session_id);
       setCurrentQuestion(data.question);
       setProgress(data.progress || { current_question: 1, total_questions: 10 });
@@ -269,6 +491,21 @@ Generate challenging but fair questions that assess both technical competency an
       setDifficulty(config.difficulty);
       setQuestionType(config.interview_type);
 
+      // Handle initial question audio if provided
+      if (data.question_audio_url && audioSettings.autoPlayQuestions) {
+        setQuestionAudio(data.question_audio_url);
+        setIsPlayingQuestion(true);
+      }
+
+      // Initialize audio analytics
+      setAudioAnalytics({
+        recordingTime: 0,
+        audioLevels: [],
+        speechPace: 'normal',
+        pauseCount: 0,
+        averageVolume: 0,
+      });
+
     } catch (err) {
       setError(err.message || 'Failed to start interview');
     } finally {
@@ -276,54 +513,82 @@ Generate challenging but fair questions that assess both technical competency an
     }
   };
 
-  const handleSubmitAnswer = async () => {
-    if (!answer.trim()) return;
+  const handleSubmitAnswer = async (textAnswer = null) => {
+    const finalAnswer = textAnswer || answer;
+    if (!finalAnswer.trim()) return;
+
     setLoading(true);
 
     try {
-      const data = await submitAnswer(sessionId, answer);
-      const feedback = data.feedback || {};
+      let data;
 
-      // Enhanced question history
-      const enhancedHistory = {
-        question: currentQuestion,
-        answer,
-        score: feedback.score || 0,
-        feedback: feedback.feedback || '',
-        strengths: feedback.strengths || [],
-        improvements: feedback.improvements || [],
-        timestamp: new Date().toISOString(),
-        questionType: questionType,
-      };
-
-      setQuestionHistory(prev => [...prev, enhancedHistory]);
-
-      // Update overall score
-      const allScores = [...questionHistory.map(q => q.score), feedback.score || 0];
-      const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
-      setScore(Math.round(avgScore));
-
-      if (data.status === 'continue') {
-        // Smart next question
-        let nextQuestion;
-        if (feedback.needsFollowUp) {
-          setFollowUpMode(true);
-          nextQuestion = await generateFollowUpQuestion(answer, currentQuestion);
-        } else {
-          setFollowUpMode(false);
-          nextQuestion = data.next_question || await generateAdvancedQuestion();
-        }
-
-        setCurrentQuestion(nextQuestion);
-        setProgress(data.progress || progress);
-        setAnswer('');
-        setSuggestions([]);
+      if (inputMode === 'text' || textAnswer) {
+        // Standard text submission
+        data = await submitAnswer(sessionId, finalAnswer);
       } else {
-        // Interview completed
-        clearInterval(timerRef.current);
-        if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
-        if (recognitionRef.current) recognitionRef.current.stop();
-        navigate('/feedback');
+        // Enhanced submission with audio context
+        data = await submitEnhancedAnswer(
+          sessionId,
+          finalAnswer,
+          {
+            inputMode,
+            transcriptionConfidence: transcriptionData.confidence,
+            realTimeAnalytics: audioAnalytics,
+          },
+          transcriptionData.text ? {
+            transcription: transcriptionData.text,
+            confidence: transcriptionData.confidence,
+            duration: audioAnalytics.recordingTime,
+            audioQuality: 'good',
+          } : null
+        );
+      }
+
+      // Handle response based on mode
+      if (inputMode !== 'text' && data.feedback_audio_url) {
+        await handleAudioPipelineResponse(data);
+      } else {
+        // Standard text response handling
+        const feedback = data.feedback || {};
+
+        const enhancedHistory = {
+          question: currentQuestion,
+          answer: finalAnswer,
+          score: feedback.score || 0,
+          feedback: feedback.feedback || '',
+          strengths: feedback.strengths || [],
+          improvements: feedback.improvements || [],
+          timestamp: new Date().toISOString(),
+          questionType: questionType,
+        };
+
+        setQuestionHistory(prev => [...prev, enhancedHistory]);
+
+        // Update overall score
+        const allScores = [...questionHistory.map(q => q.score), feedback.score || 0];
+        const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+        setScore(Math.round(avgScore));
+
+        if (data.status === 'continue') {
+          let nextQuestion;
+          if (feedback.needsFollowUp) {
+            setFollowUpMode(true);
+            nextQuestion = await generateFollowUpQuestion(finalAnswer, currentQuestion);
+          } else {
+            setFollowUpMode(false);
+            nextQuestion = data.next_question || await generateAdvancedQuestion();
+          }
+
+          setCurrentQuestion(nextQuestion);
+          setProgress(data.progress || progress);
+          setAnswer('');
+          setSuggestions([]);
+          setTranscriptionData({ text: '', confidence: 0, isLive: false });
+        } else {
+          // Interview completed
+          await cleanupInterview();
+          navigate('/feedback');
+        }
       }
     } catch (err) {
       setError(err.message);
@@ -416,12 +681,33 @@ Generate challenging but fair questions that assess both technical competency an
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Experience</Label>
-                    <Input
-                      placeholder="e.g., 3 years"
-                      value={config.experience}
-                      onChange={(e) => setConfig({ ...config, experience: e.target.value })}
-                    />
+                    <Label>Experience Level</Label>
+                    <div className="space-y-3">
+                      {[
+                        { value: 'junior', label: 'Junior (0-2 years)', desc: 'Entry level with basic skills' },
+                        { value: 'mid-level', label: 'Mid-level (3-5 years)', desc: 'Experienced with solid skills' },
+                        { value: 'senior', label: 'Senior (5+ years)', desc: 'Expert with leadership abilities' }
+                      ].map((exp) => (
+                        <label key={exp.value} className="flex items-start gap-3 cursor-pointer group">
+                          <input
+                            type="radio"
+                            name="experience"
+                            value={exp.value}
+                            checked={config.experience === exp.value}
+                            onChange={(e) => setConfig({ ...config, experience: e.target.value })}
+                            className="w-4 h-4 mt-0.5 text-emerald-500 bg-gray-900 border-gray-600 focus:ring-emerald-500"
+                          />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-white/90 group-hover:text-white transition-colors">
+                              {exp.label}
+                            </div>
+                            <div className="text-xs text-white/50 mt-0.5">
+                              {exp.desc}
+                            </div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Position</Label>
@@ -432,12 +718,104 @@ Generate challenging but fair questions that assess both technical competency an
                   </div>
                   <div className="space-y-2">
                     <Label>Industry</Label>
-                    <Input
-                      placeholder="e.g., Technology"
-                      value={config.industry}
-                      onChange={(e) => setConfig({ ...config, industry: e.target.value })}
-                    />
+                    <Select value={config.industry} onValueChange={(v) => setConfig({ ...config, industry: v })}>
+                      <SelectOption value="technology">Technology</SelectOption>
+                      <SelectOption value="healthcare">Healthcare</SelectOption>
+                      <SelectOption value="finance">Finance & Banking</SelectOption>
+                      <SelectOption value="ecommerce">E-commerce & Retail</SelectOption>
+                      <SelectOption value="consulting">Consulting</SelectOption>
+                      <SelectOption value="education">Education</SelectOption>
+                      <SelectOption value="manufacturing">Manufacturing</SelectOption>
+                      <SelectOption value="media">Media & Entertainment</SelectOption>
+                      <SelectOption value="automotive">Automotive</SelectOption>
+                      <SelectOption value="energy">Energy & Utilities</SelectOption>
+                      <SelectOption value="aerospace">Aerospace & Defense</SelectOption>
+                      <SelectOption value="other">Other</SelectOption>
+                    </Select>
                   </div>
+                </div>
+
+                {/* Audio Configuration Section */}
+                <div className="space-y-4 p-4 rounded-lg bg-gradient-to-r from-emerald-500/10 to-blue-500/10 border border-emerald-500/20">
+                  <div className="flex items-center gap-2">
+                    <Headphones className="w-5 h-5 text-emerald-400" />
+                    <Label className="text-base font-medium text-emerald-300">Audio Interview Settings</Label>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Interview Mode</Label>
+                      <Select value={inputMode} onValueChange={setInputMode}>
+                        <SelectOption value="hybrid">🎯 Hybrid (Voice + Text)</SelectOption>
+                        <SelectOption value="audio">🎙️ Voice Only</SelectOption>
+                        <SelectOption value="text">📝 Text Only</SelectOption>
+                      </Select>
+                      <p className="text-xs text-white/50">
+                        {inputMode === 'hybrid' ? 'Best of both worlds - speak or type answers' :
+                         inputMode === 'audio' ? 'Complete voice-enabled interview experience' :
+                         'Traditional text-based interview'}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Audio Features</Label>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={audioSettings.autoPlayQuestions}
+                            onChange={(e) => setAudioSettings(prev => ({
+                              ...prev,
+                              autoPlayQuestions: e.target.checked
+                            }))}
+                            className="w-4 h-4 text-emerald-500 bg-gray-900 border-gray-600 rounded focus:ring-emerald-500"
+                          />
+                          <span className="text-sm text-white/80">Auto-play questions</span>
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={audioSettings.autoPlayFeedback}
+                            onChange={(e) => setAudioSettings(prev => ({
+                              ...prev,
+                              autoPlayFeedback: e.target.checked
+                            }))}
+                            className="w-4 h-4 text-emerald-500 bg-gray-900 border-gray-600 rounded focus:ring-emerald-500"
+                          />
+                          <span className="text-sm text-white/80">Auto-play feedback</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Microphone Test */}
+                  {(inputMode === 'audio' || inputMode === 'hybrid') && (
+                    <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-white/80">Microphone Test</span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                              stream.getTracks().forEach(track => track.stop());
+                              setError('');
+                            } catch (error) {
+                              setError('Microphone access denied. Please check permissions.');
+                            }
+                          }}
+                        >
+                          Test Mic
+                        </Button>
+                      </div>
+                      <p className="text-xs text-white/50">
+                        Ensure your microphone is working properly for the best interview experience.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Skills */}
@@ -507,12 +885,80 @@ Generate challenging but fair questions that assess both technical competency an
                 <span className="text-sm font-mono font-medium text-white">{formatTime(timer)}</span>
               </div>
 
+              {/* Mobile Progress Indicator */}
+              <div className="sm:hidden flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Progress value={(progress.current_question / progress.total_questions) * 100} className="w-20 h-1.5" />
+                  <span className="text-xs text-white/70 font-mono">{progress.current_question}/{progress.total_questions}</span>
+                </div>
+                <Badge variant="outline" className={`text-xs px-2 py-0.5 ${
+                  loading ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                  isProcessingAudio ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                  isRecording ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                  'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                }`}>
+                  <div className={`w-1 h-1 rounded-full mr-1 ${
+                    loading ? 'bg-yellow-400 animate-pulse' :
+                    isProcessingAudio ? 'bg-blue-400 animate-pulse' :
+                    isRecording ? 'bg-red-400 animate-pulse' :
+                    'bg-emerald-400 animate-pulse'
+                  }`} />
+                  {loading ? 'Processing' :
+                   isProcessingAudio ? 'Analyzing' :
+                   isRecording ? 'Recording' :
+                   'Active'}
+                </Badge>
+              </div>
+
               <div className="hidden sm:flex items-center gap-4">
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-white/50">Progress:</span>
                   <div className="flex items-center gap-2">
                     <Progress value={(progress.current_question / progress.total_questions) * 100} className="w-32 h-2" />
                     <span className="text-xs text-white/70 font-mono">{progress.current_question}/{progress.total_questions}</span>
+                  </div>
+                </div>
+
+                {/* Enhanced Session Status Indicator */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-white/50">Status:</span>
+                  <Badge variant="outline" className={`text-xs ${
+                    loading ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                    isProcessingAudio ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                    isRecording ? 'bg-red-500/20 text-red-400 border-red-500/30' :
+                    questionHistory.length === progress.total_questions ? 'bg-green-500/20 text-green-400 border-green-500/30' :
+                    'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                  }`}>
+                    <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                      loading ? 'bg-yellow-400 animate-pulse' :
+                      isProcessingAudio ? 'bg-blue-400 animate-pulse' :
+                      isRecording ? 'bg-red-400 animate-pulse' :
+                      questionHistory.length === progress.total_questions ? 'bg-green-400' :
+                      'bg-emerald-400 animate-pulse'
+                    }`} />
+                    {loading ? 'Processing' :
+                     isProcessingAudio ? 'Analyzing' :
+                     isRecording ? 'Recording' :
+                     questionHistory.length === progress.total_questions ? 'Complete' :
+                     'Active'}
+                  </Badge>
+                </div>
+
+                {/* Interview Progress Stats */}
+                <div className="flex items-center gap-3 px-3 py-1 rounded-lg bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-1.5">
+                    <Target className="w-3 h-3 text-emerald-400" />
+                    <span className="text-xs text-white/70">Score:</span>
+                    <span className="text-xs font-bold text-emerald-400">{score}</span>
+                  </div>
+                  <div className="w-px h-4 bg-white/20"></div>
+                  <div className="flex items-center gap-1.5">
+                    <BarChart3 className="w-3 h-3 text-blue-400" />
+                    <span className="text-xs text-white/70">Avg:</span>
+                    <span className="text-xs font-bold text-blue-400">
+                      {questionHistory.length > 0 ?
+                        Math.round(questionHistory.reduce((acc, q) => acc + (q.score || 0), 0) / questionHistory.length) : 0}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -561,7 +1007,7 @@ Generate challenging but fair questions that assess both technical competency an
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Advanced Question + Answer Section */}
           <div className="lg:col-span-2 space-y-6">
-            {/* AI Interviewer Card */}
+            {/* AI Interviewer Card with Audio Support */}
             <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 border-white/10">
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-4">
@@ -577,7 +1023,7 @@ Generate challenging but fair questions that assess both technical competency an
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle className="text-lg font-semibold text-white">AI Interviewer</CardTitle>
-                        <p className="text-sm text-white/50">Question {progress.current_question} of {progress.total_questions} • {questionType} interview</p>
+                        <p className="text-sm text-white/50">Question {progress.current_question} of {progress.total_questions} • {questionType} interview • {inputMode} mode</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {followUpMode && (
@@ -586,24 +1032,84 @@ Generate challenging but fair questions that assess both technical competency an
                             Deep Dive
                           </Badge>
                         )}
-                        <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                        <Badge variant="outline" className={`${
+                          inputMode === 'audio' ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' :
+                          inputMode === 'hybrid' ? 'text-blue-400 border-blue-500/30 bg-blue-500/10' :
+                          'text-purple-400 border-purple-500/30 bg-purple-500/10'
+                        }`}>
                           <Star className="w-3 h-3 mr-1" />
-                          Pro Mode
+                          {inputMode === 'audio' ? 'Voice Pro' :
+                           inputMode === 'hybrid' ? 'Hybrid Pro' :
+                           'Text Pro'}
                         </Badge>
                       </div>
                     </div>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="min-h-[140px] p-6 rounded-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] backdrop-blur-sm">
                   <p className="text-white/95 leading-relaxed text-lg">
                     {displayedQuestion}
                     <span className="animate-pulse text-emerald-400 ml-1">|</span>
                   </p>
                 </div>
+
+                {/* Question Audio Player */}
+                {questionAudio && (
+                  <AudioPlayer
+                    audioUrl={questionAudio}
+                    audioText={currentQuestion}
+                    autoPlay={audioSettings.autoPlayQuestions}
+                    onPlaybackComplete={() => setIsPlayingQuestion(false)}
+                    className="bg-white/5 border border-white/10 rounded-lg"
+                  />
+                )}
               </CardContent>
             </Card>
+
+            {/* Real-time Transcription Display */}
+            <AnimatePresence>
+              {transcriptionData.text && inputMode !== 'text' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Card className="bg-gradient-to-r from-green-500/10 via-emerald-500/10 to-teal-500/10 border-green-500/20 backdrop-blur-sm">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                          <Volume2 className="w-4 h-4 text-white" />
+                        </div>
+                        <span className="text-sm font-semibold text-green-300">
+                          {transcriptionData.isLive ? 'Live Transcription' : 'Final Transcription'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Badge className={`text-xs ${
+                            transcriptionData.confidence > 0.8 ? 'bg-green-500/20 text-green-300' :
+                            transcriptionData.confidence > 0.6 ? 'bg-yellow-500/20 text-yellow-300' :
+                            'bg-red-500/20 text-red-300'
+                          }`}>
+                            {Math.round(transcriptionData.confidence * 100)}% confident
+                          </Badge>
+                          {transcriptionData.isLive && (
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-green-100 leading-relaxed">
+                        {transcriptionData.text}
+                        {transcriptionData.isLive && (
+                          <span className="animate-pulse text-green-400 ml-1">|</span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Smart Suggestions Panel */}
             <AnimatePresence>
@@ -643,66 +1149,58 @@ Generate challenging but fair questions that assess both technical competency an
               )}
             </AnimatePresence>
 
-            {/* Advanced Answer Input */}
+            {/* Advanced Answer Input with Audio Support */}
             <Card className="bg-gradient-to-br from-gray-900/60 to-gray-800/20 border-white/10">
-              <CardContent className="p-6">
-                <div className="space-y-5">
-                  {/* Enhanced Text Area */}
-                  <div className="relative group">
-                    <Textarea
-                      placeholder="Share your experience here... (💬 Voice input available)"
-                      value={answer}
-                      onChange={(e) => setAnswer(e.target.value)}
-                      className="min-h-[180px] text-lg bg-white/[0.02] border-white/10 focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all duration-200 resize-none pr-16"
-                    />
-
-                    {/* Voice Recording Visual Indicator */}
-                    {isRecording && (
-                      <div className="absolute top-4 right-4">
-                        <motion.div
-                          animate={{
-                            scale: [1, 1.3, 1],
-                            boxShadow: ["0 0 0 0 rgba(239, 68, 68, 0.7)", "0 0 0 10px rgba(239, 68, 68, 0)", "0 0 0 0 rgba(239, 68, 68, 0)"]
-                          }}
-                          transition={{ repeat: Infinity, duration: 1.5 }}
-                          className="w-4 h-4 bg-red-500 rounded-full"
-                        />
-                      </div>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-semibold text-white">Your Response</CardTitle>
+                  <div className="flex items-center gap-2">
+                    {inputMode !== 'text' && (
+                      <Badge variant="outline" className="text-emerald-400 border-emerald-500/30">
+                        <Headphones className="w-3 h-3 mr-1" />
+                        Voice Enabled
+                      </Badge>
                     )}
-
-                    {/* Smart Input Overlay */}
-                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4 text-xs text-white/40">
-                        <span className="flex items-center gap-2">
-                          📝 <strong>{answer.split(' ').filter(w => w.length > 0).length}</strong> words
-                        </span>
-                        <span className="flex items-center gap-2">
-                          ⏱️ <strong>{answer.length}</strong> chars
-                        </span>
-                        {answer.length > 200 && (
-                          <span className="text-emerald-400 flex items-center gap-1">
-                            ✨ Great detail!
-                          </span>
-                        )}
-                      </div>
-
-                      {voiceToText && (
-                        <motion.div
-                          animate={{ opacity: [0.5, 1, 0.5] }}
-                          transition={{ repeat: Infinity, duration: 2 }}
-                          className="text-green-400 flex items-center gap-1 text-xs font-medium"
-                        >
-                          <Headphones className="w-3 h-3" />
-                          Listening...
-                        </motion.div>
-                      )}
-                    </div>
+                    {isProcessingAudio && (
+                      <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                        <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                        Processing
+                      </Badge>
+                    )}
                   </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                {inputMode === 'text' ? (
+                  /* Text-Only Mode */
+                  <div className="space-y-5">
+                    <div className="relative group">
+                      <Textarea
+                        placeholder="Share your experience here..."
+                        value={answer}
+                        onChange={(e) => setAnswer(e.target.value)}
+                        className="min-h-[180px] text-lg bg-white/[0.02] border-white/10 focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all duration-200 resize-none"
+                      />
 
-                  {/* Advanced Control Bar */}
-                  <div className="flex items-center gap-3">
+                      <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-xs text-white/40">
+                          <span className="flex items-center gap-2">
+                            📝 <strong>{answer.split(' ').filter(w => w.length > 0).length}</strong> words
+                          </span>
+                          <span className="flex items-center gap-2">
+                            ⏱️ <strong>{answer.length}</strong> chars
+                          </span>
+                          {answer.length > 200 && (
+                            <span className="text-emerald-400 flex items-center gap-1">
+                              ✨ Great detail!
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <Button
-                      className="flex-1 h-12 text-base font-medium bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 transition-all duration-200"
+                      className="w-full h-12 text-base font-medium bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 transition-all duration-200"
                       onClick={handleSubmitAnswer}
                       disabled={loading || !answer.trim()}
                     >
@@ -718,33 +1216,286 @@ Generate challenging but fair questions that assess both technical competency an
                         </>
                       )}
                     </Button>
-
-                    {/* Voice Control Button */}
-                    <Button
-                      variant={voiceToText ? "default" : "secondary"}
-                      size="lg"
-                      onClick={toggleVoiceToText}
-                      className={`h-12 px-4 ${voiceToText ? "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500" : "bg-white/10 hover:bg-white/20"} transition-all duration-200`}
-                    >
-                      {voiceToText ? (
-                        <Volume2 className="w-5 h-5" />
-                      ) : (
-                        <VolumeX className="w-5 h-5" />
+                  </div>
+                ) : (
+                  /* Audio/Hybrid Mode */
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
+                      <Button
+                        variant={inputMode === 'hybrid' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setInputMode('hybrid')}
+                        className="flex items-center gap-2"
+                      >
+                        <Mic className="w-4 h-4" />
+                        Voice Response
+                      </Button>
+                      {inputMode === 'hybrid' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Text Backup
+                        </Button>
                       )}
-                    </Button>
+                    </div>
 
-                    {/* End Interview Button */}
+                    {/* Voice Recording Section */}
+                    <AudioRecorder
+                      onRecordingComplete={handleRecordingComplete}
+                      onTranscriptionUpdate={handleTranscriptionUpdate}
+                      maxDuration={120}
+                      className="bg-white/5 rounded-xl p-4"
+                    />
+
+                    {/* Text Backup for Hybrid Mode */}
+                    {inputMode === 'hybrid' && (
+                      <div className="space-y-4 border-t border-white/10 pt-4">
+                        <div className="flex items-center gap-2">
+                          <Plus className="w-4 h-4 text-white/60" />
+                          <span className="text-sm font-medium text-white/80">Text Backup Option</span>
+                        </div>
+
+                        <div className="relative group">
+                          <Textarea
+                            placeholder="Type here or use voice recording above..."
+                            value={answer}
+                            onChange={(e) => setAnswer(e.target.value)}
+                            className="min-h-[120px] text-lg bg-white/[0.02] border-white/10 focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all duration-200 resize-none"
+                          />
+
+                          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                            <div className="flex items-center gap-4 text-xs text-white/40">
+                              <span className="flex items-center gap-2">
+                                📝 <strong>{answer.split(' ').filter(w => w.length > 0).length}</strong> words
+                              </span>
+                              <span className="flex items-center gap-2">
+                                ⏱️ <strong>{answer.length}</strong> chars
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button
+                          className="w-full h-12 text-base font-medium bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 transition-all duration-200"
+                          onClick={() => handleSubmitAnswer(answer)}
+                          disabled={loading || !answer.trim()}
+                        >
+                          {loading ? (
+                            <>
+                              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-5 h-5 mr-2" />
+                              Submit Text Answer
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Control Bar */}
+                <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/10">
+                  <div className="flex items-center gap-2">
                     <Button
-                      variant="destructive"
-                      className="h-12 px-6 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500"
-                      onClick={() => navigate('/feedback')}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setInputMode(
+                        inputMode === 'text' ? 'hybrid' :
+                        inputMode === 'hybrid' ? 'audio' : 'text'
+                      )}
+                      className="text-white/60 hover:text-white"
                     >
-                      End
+                      <Settings className="w-4 h-4 mr-2" />
+                      Switch to {
+                        inputMode === 'text' ? 'Voice' :
+                        inputMode === 'hybrid' ? 'Audio Only' : 'Text'
+                      }
                     </Button>
                   </div>
+
+                  <Button
+                    variant="destructive"
+                    className="h-10 px-6 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500"
+                    onClick={() => navigate('/feedback')}
+                  >
+                    End Interview
+                  </Button>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Enhanced AI Response Section */}
+            <AnimatePresence>
+              {(audioResponse || (questionHistory.length > 0)) && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <Card className="bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-red-500/10 border-purple-500/20">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <motion.div
+                            animate={isPlayingFeedback ? { scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] } : {}}
+                            transition={{ duration: 0.6, repeat: isPlayingFeedback ? Infinity : 0 }}
+                            className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center"
+                          >
+                            <Brain className={`w-5 h-5 text-white ${isPlayingFeedback ? 'animate-pulse' : ''}`} />
+                          </motion.div>
+                          <div>
+                            <CardTitle className="text-lg text-purple-300">AI Feedback</CardTitle>
+                            <p className="text-xs text-purple-400/70">
+                              {isPlayingFeedback ? 'Speaking...' : 'Analysis Complete'}
+                            </p>
+                          </div>
+                        </div>
+
+                        {questionHistory.length > 0 && (
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-white mb-1">
+                              {questionHistory[questionHistory.length - 1]?.score || 0}
+                            </div>
+                            <div className="text-xs text-white/50">Score</div>
+                          </div>
+                        )}
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-4">
+                      {/* Score Visualization */}
+                      {questionHistory.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-white/70">Performance</span>
+                            <span className="text-purple-300 font-medium">
+                              {questionHistory[questionHistory.length - 1]?.score || 0}/100
+                            </span>
+                          </div>
+                          <Progress
+                            value={questionHistory[questionHistory.length - 1]?.score || 0}
+                            className="h-3 bg-white/10"
+                          />
+                          <div className="flex justify-between text-xs text-white/40">
+                            <span>Needs Work</span>
+                            <span>Good</span>
+                            <span>Excellent</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Audio Player */}
+                      {audioResponse && (
+                        <AudioPlayer
+                          audioSrc={audioResponse}
+                          transcript={questionHistory[questionHistory.length - 1]?.feedback || ''}
+                          autoPlay={audioSettings.autoPlayFeedback}
+                          showControls={true}
+                          showTranscript={true}
+                          title="AI Feedback Audio"
+                          onPlaybackComplete={() => {
+                            setIsPlayingFeedback(false);
+                          }}
+                        />
+                      )}
+
+                      {/* Feedback Text */}
+                      {questionHistory.length > 0 && questionHistory[questionHistory.length - 1]?.feedback && (
+                        <div className="p-4 rounded-lg bg-white/5 border border-purple-500/20">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
+                              <Lightbulb className="w-3 h-3 text-white" />
+                            </div>
+                            <span className="text-sm font-medium text-purple-300">Detailed Analysis</span>
+                          </div>
+                          <p className="text-white/90 leading-relaxed">
+                            {questionHistory[questionHistory.length - 1].feedback}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Strengths & Improvements */}
+                      {questionHistory.length > 0 && (
+                        <div className="grid md:grid-cols-2 gap-4">
+                          {/* Strengths */}
+                          {questionHistory[questionHistory.length - 1]?.strengths?.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-green-400" />
+                                <span className="text-sm font-medium text-green-300">Strengths</span>
+                              </div>
+                              <div className="space-y-2">
+                                {questionHistory[questionHistory.length - 1].strengths.slice(0, 3).map((strength, index) => (
+                                  <motion.div
+                                    key={index}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                    className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20"
+                                  >
+                                    <Star className="w-3 h-3 text-green-400 flex-shrink-0" />
+                                    <span className="text-sm text-green-300">{strength}</span>
+                                  </motion.div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Improvements */}
+                          {questionHistory[questionHistory.length - 1]?.improvements?.length > 0 && (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-orange-400" />
+                                <span className="text-sm font-medium text-orange-300">Areas to Improve</span>
+                              </div>
+                              <div className="space-y-2">
+                                {questionHistory[questionHistory.length - 1].improvements.slice(0, 3).map((improvement, index) => (
+                                  <motion.div
+                                    key={index}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.1 + 0.2 }}
+                                    className="flex items-center gap-2 p-2 rounded-lg bg-orange-500/10 border border-orange-500/20"
+                                  >
+                                    <Zap className="w-3 h-3 text-orange-400 flex-shrink-0" />
+                                    <span className="text-sm text-orange-300">{improvement}</span>
+                                  </motion.div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Continue Button */}
+                      {questionHistory.length > 0 && (
+                        <div className="flex justify-center pt-2">
+                          <Button
+                            onClick={() => {
+                              // Reset for next question
+                              setAudioResponse(null);
+                              setIsPlayingFeedback(false);
+                            }}
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500"
+                          >
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Continue Interview
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Advanced Sidebar: Camera + History */}
