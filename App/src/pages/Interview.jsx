@@ -643,65 +643,103 @@ Generate challenging but fair questions that assess both technical competency an
               )}
             </AnimatePresence>
 
-            <Card>
-              <CardContent className="p-5">
-                <div className="space-y-4">
-                  {/* Enhanced Answer Input */}
-                  <div className="relative">
+            {/* Advanced Answer Input */}
+            <Card className="bg-gradient-to-br from-gray-900/60 to-gray-800/20 border-white/10">
+              <CardContent className="p-6">
+                <div className="space-y-5">
+                  {/* Enhanced Text Area */}
+                  <div className="relative group">
                     <Textarea
-                      placeholder="Type your answer here... (or use voice input)"
+                      placeholder="Share your experience here... (💬 Voice input available)"
                       value={answer}
                       onChange={(e) => setAnswer(e.target.value)}
-                      className="min-h-[150px] pr-20"
+                      className="min-h-[180px] text-lg bg-white/[0.02] border-white/10 focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all duration-200 resize-none pr-16"
                     />
 
-                    {/* Voice Recording Indicator */}
+                    {/* Voice Recording Visual Indicator */}
                     {isRecording && (
-                      <div className="absolute top-3 right-3">
+                      <div className="absolute top-4 right-4">
                         <motion.div
-                          animate={{ scale: [1, 1.2, 1] }}
-                          transition={{ repeat: Infinity, duration: 1 }}
-                          className="w-3 h-3 bg-red-500 rounded-full"
+                          animate={{
+                            scale: [1, 1.3, 1],
+                            boxShadow: ["0 0 0 0 rgba(239, 68, 68, 0.7)", "0 0 0 10px rgba(239, 68, 68, 0)", "0 0 0 0 rgba(239, 68, 68, 0)"]
+                          }}
+                          transition={{ repeat: Infinity, duration: 1.5 }}
+                          className="w-4 h-4 bg-red-500 rounded-full"
                         />
                       </div>
                     )}
-                  </div>
 
-                  {/* Answer Stats */}
-                  <div className="flex items-center justify-between text-xs text-white/40">
-                    <div className="flex items-center gap-4">
-                      <span>Words: {answer.split(' ').filter(w => w.length > 0).length}</span>
-                      <span>Characters: {answer.length}</span>
-                      {realTimeAnalysis.sentiment !== 'neutral' && (
-                        <span className="text-blue-400">Sentiment: {realTimeAnalysis.sentiment}</span>
+                    {/* Smart Input Overlay */}
+                    <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-xs text-white/40">
+                        <span className="flex items-center gap-2">
+                          📝 <strong>{answer.split(' ').filter(w => w.length > 0).length}</strong> words
+                        </span>
+                        <span className="flex items-center gap-2">
+                          ⏱️ <strong>{answer.length}</strong> chars
+                        </span>
+                        {answer.length > 200 && (
+                          <span className="text-emerald-400 flex items-center gap-1">
+                            ✨ Great detail!
+                          </span>
+                        )}
+                      </div>
+
+                      {voiceToText && (
+                        <motion.div
+                          animate={{ opacity: [0.5, 1, 0.5] }}
+                          transition={{ repeat: Infinity, duration: 2 }}
+                          className="text-green-400 flex items-center gap-1 text-xs font-medium"
+                        >
+                          <Headphones className="w-3 h-3" />
+                          Listening...
+                        </motion.div>
                       )}
                     </div>
-                    {voiceToText && (
-                      <span className="text-green-400 flex items-center gap-1">
-                        <Headphones className="w-3 h-3" />
-                        Voice Active
-                      </span>
-                    )}
                   </div>
 
-                  <div className="flex gap-3">
-                    <Button className="flex-1" onClick={handleSubmitAnswer} disabled={loading || !answer.trim()}>
-                      {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
-                      Submit Answer
+                  {/* Advanced Control Bar */}
+                  <div className="flex items-center gap-3">
+                    <Button
+                      className="flex-1 h-12 text-base font-medium bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 transition-all duration-200"
+                      onClick={handleSubmitAnswer}
+                      disabled={loading || !answer.trim()}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-5 h-5 mr-2" />
+                          Submit Answer
+                        </>
+                      )}
                     </Button>
 
-                    {/* Voice Control */}
+                    {/* Voice Control Button */}
                     <Button
                       variant={voiceToText ? "default" : "secondary"}
                       size="lg"
                       onClick={toggleVoiceToText}
-                      className={voiceToText ? "bg-green-600 hover:bg-green-700" : ""}
+                      className={`h-12 px-4 ${voiceToText ? "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500" : "bg-white/10 hover:bg-white/20"} transition-all duration-200`}
                     >
-                      {voiceToText ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                      {voiceToText ? (
+                        <Volume2 className="w-5 h-5" />
+                      ) : (
+                        <VolumeX className="w-5 h-5" />
+                      )}
                     </Button>
 
-                    <Button variant="destructive" onClick={() => navigate('/feedback')}>
-                      End Interview
+                    {/* End Interview Button */}
+                    <Button
+                      variant="destructive"
+                      className="h-12 px-6 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500"
+                      onClick={() => navigate('/feedback')}
+                    >
+                      End
                     </Button>
                   </div>
                 </div>
@@ -709,12 +747,18 @@ Generate challenging but fair questions that assess both technical competency an
             </Card>
           </div>
 
-          {/* Sidebar: Camera, Analytics + History */}
+          {/* Advanced Sidebar: Camera + History */}
           <div className="space-y-6">
-            {/* Enhanced Camera Card */}
-            <Card>
+            {/* Enhanced Professional Camera */}
+            <Card className="bg-gradient-to-br from-gray-900/60 to-gray-800/30 border-white/10">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-white/80 flex items-center gap-2">
+                  <Eye className="w-4 h-4" />
+                  Interview Presence
+                </CardTitle>
+              </CardHeader>
               <CardContent className="p-4">
-                <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden mb-3 relative group">
+                <div className="aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl overflow-hidden mb-4 relative group border border-white/10">
                   <video
                     ref={videoRef}
                     autoPlay
@@ -722,55 +766,51 @@ Generate challenging but fair questions that assess both technical competency an
                     muted
                     className={`w-full h-full object-cover ${!isVideoOn ? 'hidden' : ''}`}
                   />
+
                   {!isVideoOn && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <VideoOff className="w-8 h-8 text-white/20" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <VideoOff className="w-12 h-12 text-white/20 mb-2" />
+                      <span className="text-sm text-white/40">Camera Off</span>
                     </div>
                   )}
 
-                  {/* Real-time Analysis Overlay */}
-                  {isVideoOn && (
-                    <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="text-xs text-white/80 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span>Eye Contact:</span>
-                          <span className="text-green-400">{Math.round(presentationScore.eyeContact)}%</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Posture:</span>
-                          <span className="text-blue-400">{Math.round(presentationScore.posture)}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recording Indicator */}
+                  {/* Professional Recording Indicator */}
                   {isRecording && (
                     <motion.div
-                      animate={{ opacity: [1, 0.3, 1] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                      className="absolute top-2 right-2"
+                      animate={{ opacity: [1, 0.4, 1] }}
+                      transition={{ repeat: Infinity, duration: 2 }}
+                      className="absolute top-3 right-3"
                     >
-                      <div className="bg-red-500 text-white px-2 py-1 rounded text-xs font-medium flex items-center gap-1">
+                      <div className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 shadow-lg">
                         <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                        VOICE
+                        RECORDING
                       </div>
                     </motion.div>
                   )}
+
+                  {/* Camera Status Overlay */}
+                  <div className="absolute bottom-3 left-3 right-3 bg-black/60 backdrop-blur-md rounded-lg p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="text-xs text-white/90 text-center">
+                      Professional Interview Mode {isVideoOn ? '• Camera Active' : '• Camera Off'}
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex gap-2 justify-center mb-3">
+                {/* Advanced Controls */}
+                <div className="flex gap-2 justify-center mb-4">
                   <Button
-                    variant={isVideoOn ? 'secondary' : 'destructive'}
+                    variant={isVideoOn ? 'default' : 'destructive'}
                     size="sm"
                     onClick={() => setIsVideoOn(!isVideoOn)}
+                    className={`${isVideoOn ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'} transition-all duration-200`}
                   >
                     {isVideoOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
                   </Button>
                   <Button
-                    variant={isAudioOn ? 'secondary' : 'destructive'}
+                    variant={isAudioOn ? 'default' : 'destructive'}
                     size="sm"
                     onClick={() => setIsAudioOn(!isAudioOn)}
+                    className={`${isAudioOn ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'} transition-all duration-200`}
                   >
                     {isAudioOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
                   </Button>
@@ -778,49 +818,48 @@ Generate challenging but fair questions that assess both technical competency an
                     variant={voiceToText ? 'default' : 'secondary'}
                     size="sm"
                     onClick={toggleVoiceToText}
-                    className={voiceToText ? 'bg-green-600 hover:bg-green-700' : ''}
+                    className={`${voiceToText ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500' : 'bg-white/10 hover:bg-white/20'} transition-all duration-200`}
                   >
                     <Headphones className="w-4 h-4" />
                   </Button>
                 </div>
 
-                {/* Presentation Analytics */}
-                <div className="text-xs text-white/60 space-y-2">
+                {/* Interview Status */}
+                <div className="text-xs text-white/60 space-y-2 bg-white/5 rounded-lg p-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Eye className="w-3 h-3" />
-                      <span>Presentation</span>
-                    </div>
-                    <span className="font-mono">
-                      {Math.round(Object.values(presentationScore).reduce((a, b) => a + b, 0) / 4)}%
-                    </span>
+                    <span className="text-white/50">Interview Mode:</span>
+                    <span className="font-medium text-emerald-400">Professional</span>
                   </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/40">Voice Quality:</span>
-                      <span>{Math.round(presentationScore.voice)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/40">Gestures:</span>
-                      <span>{Math.round(presentationScore.gestures)}%</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-white/50">Status:</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="font-medium text-green-400">Active</span>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Enhanced History */}
-            <Card>
+            {/* Advanced Performance History */}
+            <Card className="bg-gradient-to-br from-gray-900/60 to-gray-800/30 border-white/10">
               <CardHeader className="pb-3">
                 <button
                   onClick={() => setShowHistory(!showHistory)}
-                  className="flex items-center justify-between w-full"
+                  className="flex items-center justify-between w-full group"
                 >
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-white/60" />
-                    <CardTitle className="text-base">Performance History</CardTitle>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                      <BarChart3 className="w-4 h-4 text-white" />
+                    </div>
+                    <CardTitle className="text-base font-semibold">Interview History</CardTitle>
                   </div>
-                  {showHistory ? <ChevronUp className="w-4 h-4 text-white/40" /> : <ChevronDown className="w-4 h-4 text-white/40" />}
+                  <motion.div
+                    animate={{ rotate: showHistory ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <ChevronDown className="w-5 h-5 text-white/40 group-hover:text-white/70 transition-colors" />
+                  </motion.div>
                 </button>
               </CardHeader>
               <AnimatePresence>
@@ -829,35 +868,49 @@ Generate challenging but fair questions that assess both technical competency an
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
                   >
                     <CardContent className="max-h-80 overflow-y-auto space-y-3">
                       {questionHistory.length === 0 ? (
-                        <p className="text-sm text-white/30 text-center py-4">No answers yet</p>
+                        <div className="text-center py-8">
+                          <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-3">
+                            <BarChart3 className="w-6 h-6 text-white/30" />
+                          </div>
+                          <p className="text-sm text-white/30">No questions answered yet</p>
+                          <p className="text-xs text-white/20 mt-1">Your progress will appear here</p>
+                        </div>
                       ) : (
                         questionHistory.map((q, i) => (
-                          <div key={i} className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-xs text-white/40">Q{i + 1}</p>
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.1 }}
+                            className="p-4 rounded-xl bg-gradient-to-r from-white/[0.03] to-white/[0.01] border border-white/[0.06] hover:bg-white/[0.05] transition-all duration-200"
+                          >
+                            <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs text-white/60">C:{q.confidence}</span>
-                                <span className="text-xs text-white/60">E:{q.engagement}</span>
+                                <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white">
+                                  {i + 1}
+                                </div>
+                                <span className="text-xs text-white/50 font-medium">{q.questionType}</span>
                               </div>
+                              <div className="text-lg font-bold text-emerald-400">{q.score}</div>
                             </div>
-                            <p className="text-sm text-white/70 mb-2 line-clamp-2">{q.question}</p>
-                            <div className="flex items-center justify-between">
-                              <Progress value={q.score} className="flex-1 h-1.5" />
-                              <span className="text-xs font-medium text-white ml-2">{q.score}/100</span>
+                            <p className="text-sm text-white/70 mb-3 line-clamp-2 leading-relaxed">{q.question}</p>
+                            <div className="space-y-2">
+                              <Progress value={q.score} className="h-2 bg-white/10" />
+                              {q.strengths && q.strengths.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {q.strengths.slice(0, 2).map((strength, si) => (
+                                    <Badge key={si} className="text-xs bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-300 border-green-500/30">
+                                      ✓ {strength}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
                             </div>
-                            {q.strengths && q.strengths.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1">
-                                {q.strengths.slice(0, 2).map((strength, si) => (
-                                  <Badge key={si} variant="secondary" className="text-xs bg-green-500/20 text-green-400">
-                                    +{strength}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                          </motion.div>
                         ))
                       )}
                     </CardContent>
