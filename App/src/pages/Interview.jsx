@@ -815,6 +815,37 @@ export default function Interview() {
           <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">{error}</div>
         )}
 
+        {/* Pipeline Status Indicator (from UI.txt) */}
+        <div className="mb-6 p-4 rounded-xl bg-gradient-to-r from-gray-900/60 to-gray-800/30 border border-white/10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
+              enhancedState.pipelineActive
+                ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white animate-pulse'
+                : 'bg-gradient-to-r from-gray-500 to-gray-600 text-white'
+            }`}>
+              {enhancedState.pipelineActive ? (
+                <>🎤 VTT → Gemini → TTV Pipeline Active</>
+              ) : (
+                <>📝 Text-Only Mode</>
+              )}
+            </div>
+
+            <div className={`px-4 py-2 rounded-full text-sm font-semibold ${
+              enhancedState.audioEnabled
+                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
+                : 'bg-gradient-to-r from-gray-500 to-gray-600 text-white'
+            }`}>
+              {enhancedState.audioEnabled ? '🔊 Audio Enabled' : '🔇 Audio Disabled'}
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-white/70">
+              <span>Question {enhancedState.questionNumber} of {progress.total_questions}</span>
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span>{enhancedState.status === 'active' ? 'Interview Active' : 'Setup'}</span>
+            </div>
+          </div>
+        </div>
+
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Advanced Question + Answer Section */}
           <div className="lg:col-span-2 space-y-6">
@@ -843,22 +874,58 @@ export default function Interview() {
                             Deep Dive
                           </Badge>
                         )}
-                        <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                        <Badge variant="outline" className={`${
+                          enhancedState.pipelineActive
+                            ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10'
+                            : 'text-purple-400 border-purple-500/30 bg-purple-500/10'
+                        }`}>
                           <Star className="w-3 h-3 mr-1" />
-                          Pro Mode
+                          {enhancedState.pipelineActive ? 'Audio Pro' : 'Text Pro'}
                         </Badge>
                       </div>
                     </div>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="min-h-[140px] p-6 rounded-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] backdrop-blur-sm">
                   <p className="text-white/95 leading-relaxed text-lg">
                     {displayedQuestion}
                     <span className="animate-pulse text-emerald-400 ml-1">|</span>
                   </p>
                 </div>
+
+                {/* Question Audio Player (from UI.txt) */}
+                <AnimatePresence>
+                  {audioUrls.questionAudio && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                            <Headphones className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-blue-300">Question Audio</div>
+                            <div className="text-xs text-blue-400/70">AI Generated Audio</div>
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={() => playAudio(audioUrls.questionAudio)}
+                          className="bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300"
+                        >
+                          <Play className="w-4 h-4 mr-2" />
+                          🔊 Play Audio
+                        </Button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </CardContent>
             </Card>
 
@@ -900,34 +967,101 @@ export default function Interview() {
               )}
             </AnimatePresence>
 
-            {/* Advanced Answer Input */}
+            {/* Enhanced Answer Input with Audio Support */}
             <Card className="bg-gradient-to-br from-gray-900/60 to-gray-800/20 border-white/10">
               <CardContent className="p-6">
                 <div className="space-y-5">
-                  {/* Enhanced Text Area */}
-                  <div className="relative group">
-                    <Textarea
-                      placeholder="Share your experience here... (💬 Voice input available)"
-                      value={answer}
-                      onChange={(e) => setAnswer(e.target.value)}
-                      className="min-h-[180px] text-lg bg-white/[0.02] border-white/10 focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all duration-200 resize-none pr-16"
-                    />
-
-                    {/* Voice Recording Visual Indicator */}
-                    {isRecording && (
-                      <div className="absolute top-4 right-4">
-                        <motion.div
-                          animate={{
-                            scale: [1, 1.3, 1],
-                            boxShadow: ["0 0 0 0 rgba(239, 68, 68, 0.7)", "0 0 0 10px rgba(239, 68, 68, 0)", "0 0 0 0 rgba(239, 68, 68, 0)"]
-                          }}
-                          transition={{ repeat: Infinity, duration: 1.5 }}
-                          className="w-4 h-4 bg-red-500 rounded-full"
-                        />
-                      </div>
+                  {/* Enhanced Recording Controls (from UI.txt) */}
+                  <div className="flex flex-col items-center gap-4 p-6 bg-white/5 rounded-xl border border-white/10">
+                    {!enhancedState.isRecording && !enhancedState.isProcessing && (
+                      <>
+                        <Button
+                          onClick={startRecording}
+                          className="w-full max-w-sm h-14 text-lg font-semibold bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 transition-all duration-300 shadow-lg hover:shadow-red-500/25 hover:scale-105"
+                        >
+                          <Mic className="w-6 h-6 mr-3" />
+                          🎙️ Record Audio Response
+                        </Button>
+                        <Button
+                          onClick={promptTextInput}
+                          variant="secondary"
+                          className="w-full max-w-sm h-12 text-base bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 transition-all duration-200"
+                        >
+                          📝 Type Response Instead
+                        </Button>
+                      </>
                     )}
 
-                    {/* Smart Input Overlay */}
+                    {enhancedState.isRecording && (
+                      <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="flex flex-col items-center gap-4"
+                      >
+                        <div className="w-20 h-20 rounded-full bg-gradient-to-r from-red-500 to-red-600 flex items-center justify-center animate-pulse shadow-2xl">
+                          <Mic className="w-8 h-8 text-white" />
+                        </div>
+                        <p className="text-white/80 text-center">Recording your response...</p>
+                        <Button
+                          onClick={stopRecording}
+                          className="h-12 px-8 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600"
+                        >
+                          <Square className="w-5 h-5 mr-2" />
+                          ⏹️ Stop Recording
+                        </Button>
+                      </motion.div>
+                    )}
+
+                    {enhancedState.isProcessing && (
+                      <motion.div
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="flex flex-col items-center gap-4 p-6"
+                      >
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center animate-pulse">
+                          <Activity className="w-8 h-8 text-white animate-spin" />
+                        </div>
+                        <div className="text-center">
+                          <div className="text-lg font-semibold text-blue-400 mb-2">
+                            🔄 Processing through VTT → Gemini → TTV pipeline...
+                          </div>
+                          <div className="text-sm text-white/60">
+                            Converting speech to text, analyzing with AI, generating audio response
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* Transcription Display */}
+                  <AnimatePresence>
+                    {enhancedState.transcription && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="p-4 bg-gradient-to-r from-green-500/10 to-blue-500/10 rounded-xl border border-green-500/20"
+                      >
+                        <div className="flex items-center gap-2 mb-3">
+                          <Volume2 className="w-5 h-5 text-green-400" />
+                          <span className="text-sm font-semibold text-green-300">Transcription (VTT Output)</span>
+                        </div>
+                        <p className="text-white/90 leading-relaxed">
+                          {enhancedState.transcription}
+                        </p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Fallback Text Input */}
+                  <div className="relative group">
+                    <Textarea
+                      placeholder="Backup text input (or use voice recording above)..."
+                      value={answer}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      className="min-h-[120px] text-lg bg-white/[0.02] border-white/10 focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all duration-200 resize-none"
+                    />
+
                     <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
                       <div className="flex items-center gap-4 text-xs text-white/40">
                         <span className="flex items-center gap-2">
@@ -936,31 +1070,15 @@ export default function Interview() {
                         <span className="flex items-center gap-2">
                           ⏱️ <strong>{answer.length}</strong> chars
                         </span>
-                        {answer.length > 200 && (
-                          <span className="text-emerald-400 flex items-center gap-1">
-                            ✨ Great detail!
-                          </span>
-                        )}
                       </div>
-
-                      {voiceToText && (
-                        <motion.div
-                          animate={{ opacity: [0.5, 1, 0.5] }}
-                          transition={{ repeat: Infinity, duration: 2 }}
-                          className="text-green-400 flex items-center gap-1 text-xs font-medium"
-                        >
-                          <Headphones className="w-3 h-3" />
-                          Listening...
-                        </motion.div>
-                      )}
                     </div>
                   </div>
 
-                  {/* Advanced Control Bar */}
-                  <div className="flex items-center gap-3">
+                  {/* Submit Button for Text Mode */}
+                  {answer.trim() && (
                     <Button
-                      className="flex-1 h-12 text-base font-medium bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 transition-all duration-200"
-                      onClick={handleSubmitAnswer}
+                      className="w-full h-12 text-base font-medium bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-500 hover:to-blue-500 transition-all duration-200"
+                      onClick={() => submitTextResponse(answer)}
                       disabled={loading || !answer.trim()}
                     >
                       {loading ? (
@@ -971,37 +1089,138 @@ export default function Interview() {
                       ) : (
                         <>
                           <Send className="w-5 h-5 mr-2" />
-                          Submit Answer
+                          Submit Text Answer
                         </>
                       )}
                     </Button>
+                  )}
 
-                    {/* Voice Control Button */}
-                    <Button
-                      variant={voiceToText ? "default" : "secondary"}
-                      size="lg"
-                      onClick={toggleVoiceToText}
-                      className={`h-12 px-4 ${voiceToText ? "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500" : "bg-white/10 hover:bg-white/20"} transition-all duration-200`}
-                    >
-                      {voiceToText ? (
-                        <Volume2 className="w-5 h-5" />
-                      ) : (
-                        <VolumeX className="w-5 h-5" />
-                      )}
-                    </Button>
+                  {/* Control Bar */}
+                  <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                    <div className="text-sm text-white/50">
+                      {enhancedState.pipelineActive ? '🎤 Voice Mode Active' : '📝 Text Mode Active'}
+                    </div>
 
-                    {/* End Interview Button */}
                     <Button
                       variant="destructive"
-                      className="h-12 px-6 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500"
+                      className="h-10 px-6 bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500"
                       onClick={() => navigate('/feedback')}
                     >
-                      End
+                      End Interview
                     </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Enhanced AI Feedback Display (from UI.txt) */}
+            <AnimatePresence>
+              {enhancedState.feedback && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-red-500/20 rounded-2xl p-6 border border-purple-500/30"
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                        <Brain className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">🤖 AI Feedback</h3>
+                        <p className="text-purple-300 text-sm">Gemini AI Analysis</p>
+                      </div>
+                    </div>
+
+                    {audioUrls.feedbackAudio && (
+                      <Button
+                        onClick={() => playAudio(audioUrls.feedbackAudio)}
+                        className="bg-white/20 hover:bg-white/30 border border-white/30 text-white"
+                      >
+                        <Play className="w-4 h-4 mr-2" />
+                        🔊 Play Audio Feedback
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Score Display */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-white/70">Score</span>
+                      <span className="text-2xl font-bold text-white">
+                        {enhancedState.feedback.score}/10
+                      </span>
+                    </div>
+                    <div className="relative w-full h-4 bg-white/20 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(enhancedState.feedback.score / 10) * 100}%` }}
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-yellow-400 via-orange-500 to-green-500 rounded-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Evaluation */}
+                  <div className="mb-6">
+                    <h4 className="text-lg font-semibold text-white mb-3">📝 Evaluation</h4>
+                    <p className="text-white/90 leading-relaxed">
+                      {enhancedState.feedback.evaluation}
+                    </p>
+                  </div>
+
+                  {/* Strengths and Improvements */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {enhancedState.feedback.strengths?.length > 0 && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-green-400 mb-3 flex items-center gap-2">
+                          <CheckCircle className="w-5 h-5" />
+                          ✅ Strengths
+                        </h4>
+                        <ul className="space-y-2">
+                          {enhancedState.feedback.strengths.map((strength, index) => (
+                            <motion.li
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                              className="flex items-start gap-2 p-3 bg-green-500/10 rounded-lg border border-green-500/20"
+                            >
+                              <Star className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-green-300 text-sm">{strength}</span>
+                            </motion.li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {enhancedState.feedback.areas_for_improvement?.length > 0 && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-orange-400 mb-3 flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5" />
+                          📈 Areas for Improvement
+                        </h4>
+                        <ul className="space-y-2">
+                          {enhancedState.feedback.areas_for_improvement.map((improvement, index) => (
+                            <motion.li
+                              key={index}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: index * 0.1 + 0.2 }}
+                              className="flex items-start gap-2 p-3 bg-orange-500/10 rounded-lg border border-orange-500/20"
+                            >
+                              <Zap className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                              <span className="text-orange-300 text-sm">{improvement}</span>
+                            </motion.li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Advanced Sidebar: Camera + History */}
