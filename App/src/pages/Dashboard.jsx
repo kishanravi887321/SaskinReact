@@ -13,7 +13,6 @@ import { Progress } from '../components/ui/Progress';
 import { Input } from '../components/ui/Input';
 import DashboardHeader from '../components/DashboardHeader';
 import SubscriptionStatus from '../components/SubscriptionStatus';
-import ProtectedRoute from '../components/ProtectedRoute';
 import { useUser } from '../hooks/useUser';
 import { normalizeUserData, getDisplayName } from '../lib/userUtils';
 
@@ -50,8 +49,7 @@ export default function Dashboard() {
   const displayName = normalized ? getDisplayName(normalized) : 'User';
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
         <DashboardHeader />
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -242,6 +240,5 @@ export default function Dashboard() {
           </div>
         </main>
       </div>
-    </ProtectedRoute>
   );
 }

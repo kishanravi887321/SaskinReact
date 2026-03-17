@@ -71,10 +71,23 @@ export async function startInterview(config) {
   });
 }
 
-export async function submitAnswer(sessionId, answer) {
+export async function submitAnswer(sessionId, answer, analysisData = null) {
+  const payload = {
+    session_id: sessionId,
+    answer,
+  };
+
+  // Include advanced analytics if provided
+  if (analysisData) {
+    payload.real_time_metrics = analysisData.realTimeMetrics;
+    payload.presentation_score = analysisData.presentationScore;
+    payload.time_spent = analysisData.timeSpent;
+    payload.adaptive_context = analysisData.context;
+  }
+
   return apiRequest(API_ENDPOINTS.interview.answer, {
     method: 'POST',
-    body: JSON.stringify({ session_id: sessionId, answer }),
+    body: JSON.stringify(payload),
   });
 }
 

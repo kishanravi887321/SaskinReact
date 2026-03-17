@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import LayoutWrapper from './components/LayoutWrapper';
+import ProtectedRoute from './components/ProtectedRoute';
 
 // Pages
 import Landing from './pages/Landing';
@@ -30,13 +31,13 @@ export default function App() {
           <Route path="/pricing" element={<Pricing />} />
 
           {/* Protected */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/roles" element={<Roles />} />
-          <Route path="/interview/:role" element={<Interview />} />
-          <Route path="/feedback" element={<Feedback />} />
-          <Route path="/insights" element={<Insights />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/subscription" element={<Subscription />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/roles" element={<ProtectedRoute><Roles /></ProtectedRoute>} />
+          <Route path="/interview/:role" element={<ProtectedRoute><Interview /></ProtectedRoute>} />
+          <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
+          <Route path="/insights" element={<ProtectedRoute><Insights /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/subscription" element={<ProtectedRoute><Subscription /></ProtectedRoute>} />
 
           {/* 404 */}
           <Route path="*" element={<NotFound />} />
