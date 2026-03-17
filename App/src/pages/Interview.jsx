@@ -62,74 +62,48 @@ export default function Interview() {
   const [emotion, setEmotion] = useState(emotions[0]);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Advanced features state
+  // Advanced features state (UI focused)
   const [isRecording, setIsRecording] = useState(false);
   const [voiceToText, setVoiceToText] = useState(false);
-  const [realTimeAnalysis, setRealTimeAnalysis] = useState({
-    confidence: 0,
-    clarity: 0,
-    engagement: 0,
-    sentiment: 'neutral',
-  });
-  const [liveScore, setLiveScore] = useState(0);
   const [suggestions, setSuggestions] = useState([]);
   const [followUpMode, setFollowUpMode] = useState(false);
-  const [presentationScore, setPresentationScore] = useState({
-    eyeContact: 0,
-    posture: 0,
-    gestures: 0,
-    voice: 0,
-  });
-  const [adaptiveContext, setAdaptiveContext] = useState({
-    difficulty: 'intermediate',
-    performancePattern: 'steady',
-    strongAreas: [],
-    improvementAreas: [],
-  });
+  const [questionType, setQuestionType] = useState('technical');
+  const [difficulty, setDifficulty] = useState('intermediate');
+  const [interviewMode, setInterviewMode] = useState('standard');
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const timerRef = useRef(null);
   const recognitionRef = useRef(null);
-  const analysisRef = useRef(null);
 
   // Advanced cleanup and initialization
   useEffect(() => {
     return () => {
-      // Cleanup all advanced features
+      // Cleanup all features
       if (timerRef.current) clearInterval(timerRef.current);
-      if (analysisRef.current) clearInterval(analysisRef.current);
       if (recognitionRef.current) recognitionRef.current.stop();
       if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
     };
   }, []);
 
-  // Real-time answer analysis
+  // Smart answer suggestions
   useEffect(() => {
     if (answer && phase === 'interview') {
-      // AI-powered real-time analysis
       const words = answer.split(' ').length;
-      const avgWordLength = answer.length / Math.max(words, 1);
 
-      // Simulate sentiment analysis
-      const positiveWords = ['excellent', 'great', 'successful', 'achieved', 'improved'];
-      const sentiment = positiveWords.some(word => answer.toLowerCase().includes(word))
-        ? 'positive' : 'neutral';
-
-      // Generate suggestions
+      // Generate smart suggestions
       const newSuggestions = [];
-      if (words < 20) {
-        newSuggestions.push('Try to elaborate more on your example');
+      if (words < 15) {
+        newSuggestions.push('💡 Try to elaborate with specific examples');
       }
-      if (avgWordLength < 4) {
-        newSuggestions.push('Use more technical terminology');
+      if (words > 5 && !answer.toLowerCase().includes('i ')) {
+        newSuggestions.push('🎯 Make it more personal - use "I" statements');
       }
-      if (!answer.includes('I')) {
-        newSuggestions.push('Make it more personal - use specific examples');
+      if (!answer.includes('?') && words > 20) {
+        newSuggestions.push('🔄 Consider asking a clarifying question');
       }
 
-      setSuggestions(newSuggestions);
-      setRealTimeAnalysis(prev => ({ ...prev, sentiment }));
+      setSuggestions(newSuggestions.slice(0, 2)); // Limit to 2 suggestions
     }
   }, [answer, phase]);
 
@@ -168,72 +142,43 @@ export default function Interview() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
-
-      // Start real-time analysis
-      analysisRef.current = setInterval(() => {
-        setRealTimeAnalysis(prev => ({
-          ...prev,
-          confidence: Math.min(100, Math.max(0, prev.confidence + (Math.random() - 0.5) * 10)),
-          clarity: Math.min(100, Math.max(0, prev.clarity + (Math.random() - 0.5) * 8)),
-          engagement: Math.min(100, Math.max(0, prev.engagement + (Math.random() - 0.5) * 12)),
-        }));
-
-        setPresentationScore(prev => ({
-          eyeContact: Math.min(100, Math.max(0, prev.eyeContact + (Math.random() - 0.5) * 5)),
-          posture: Math.min(100, Math.max(0, prev.posture + (Math.random() - 0.5) * 3)),
-          gestures: Math.min(100, Math.max(0, prev.gestures + (Math.random() - 0.5) * 7)),
-          voice: Math.min(100, Math.max(0, prev.voice + (Math.random() - 0.5) * 6)),
-        }));
-      }, 2000);
     } catch {
       console.log('Camera access denied');
     }
   }, []);
 
   const generateAdvancedQuestion = useCallback(async () => {
-    // AI-powered adaptive question generation
-    const context = {
-      role: role,
-      previousAnswers: questionHistory,
-      performance: adaptiveContext,
-      difficulty: adaptiveContext.difficulty,
+    // Smart question generation based on interview flow
+    const questionsByType = {
+      'technical': [
+        "Walk me through how you would design a scalable system for handling 1 million users.",
+        "Tell me about a time when you had to debug a critical production issue. What was your approach?",
+        "Describe a complex technical project you led. How did you break it down and manage the implementation?",
+        "How would you handle a situation where your code review revealed significant performance issues?"
+      ],
+
+      'behavioral': [
+        "Tell me about a time when you had to convince your team to adopt a new technology or approach.",
+        "Describe a situation where you had to work with a difficult stakeholder. How did you handle it?",
+        "Walk me through a project where you had to learn something completely new under tight deadlines.",
+        "Tell me about a time when you made a mistake that impacted the team. How did you handle it?"
+      ],
+
+      'problem-solving': [
+        "If you were tasked with improving our application's loading time by 50%, how would you approach it?",
+        "How would you design a feature that needs to work offline and sync when online?",
+        "Walk me through how you'd investigate if users are reporting slow performance.",
+        "How would you prioritize features when you have limited development resources?"
+      ]
     };
 
-    // Professional interview prompts based on role
-    const rolePrompts = {
-      'sde': `You are conducting a senior software engineer interview. Ask a real-world system design or coding challenge that tests:
-      - Problem-solving approach
-      - Scalability considerations
-      - Trade-off analysis
-      - Code quality practices`,
+    // Determine question type based on interview progress
+    let currentType = questionHistory.length % 3 === 0 ? 'technical' :
+                     questionHistory.length % 3 === 1 ? 'behavioral' : 'problem-solving';
 
-      'pm': `You are interviewing for a Product Manager role. Ask about:
-      - Product strategy and vision
-      - Stakeholder management
-      - Data-driven decision making
-      - Cross-functional leadership`,
-
-      'analyst': `You are conducting a Data Analyst interview. Focus on:
-      - Data interpretation skills
-      - Statistical reasoning
-      - Business impact analysis
-      - Communication of insights`,
-    };
-
-    const prompt = rolePrompts[role] || rolePrompts['sde'];
-
-    // Simulate API call to advanced AI service
-    return new Promise(resolve => {
-      setTimeout(() => {
-        const questions = [
-          "Tell me about a time when you had to optimize a system that was performing poorly. Walk me through your diagnostic process and the solutions you implemented.",
-          "Describe a situation where you had to make a technical decision with incomplete information. How did you approach it and what was the outcome?",
-          "Can you explain a complex technical concept to me as if I were a non-technical stakeholder? Choose something you've worked with recently.",
-        ];
-        resolve(questions[Math.floor(Math.random() * questions.length)]);
-      }, 1000);
-    });
-  }, [role, questionHistory, adaptiveContext]);
+    const questions = questionsByType[currentType] || questionsByType['technical'];
+    return questions[Math.floor(Math.random() * questions.length)];
+  }, [questionHistory]);
 
   const toggleVoiceToText = useCallback(() => {
     if (!voiceToText) {
@@ -320,11 +265,9 @@ Generate challenging but fair questions that assess both technical competency an
       // Initialize advanced features
       await initCamera();
 
-      // Set initial adaptive context
-      setAdaptiveContext(prev => ({
-        ...prev,
-        difficulty: config.difficulty,
-      }));
+      // Set interview mode based on config
+      setDifficulty(config.difficulty);
+      setQuestionType(config.interview_type);
 
     } catch (err) {
       setError(err.message || 'Failed to start interview');
@@ -338,19 +281,10 @@ Generate challenging but fair questions that assess both technical competency an
     setLoading(true);
 
     try {
-      // Enhanced analysis payload
-      const analysisPayload = {
-        answer: answer.trim(),
-        realTimeMetrics: realTimeAnalysis,
-        presentationScore: presentationScore,
-        timeSpent: Math.floor((Date.now() - (timer * 1000)) / 1000),
-        context: adaptiveContext,
-      };
-
-      const data = await submitAnswer(sessionId, answer, analysisPayload);
+      const data = await submitAnswer(sessionId, answer);
       const feedback = data.feedback || {};
 
-      // Enhanced question history with advanced metrics
+      // Enhanced question history
       const enhancedHistory = {
         question: currentQuestion,
         answer,
@@ -358,41 +292,25 @@ Generate challenging but fair questions that assess both technical competency an
         feedback: feedback.feedback || '',
         strengths: feedback.strengths || [],
         improvements: feedback.improvements || [],
-        confidence: realTimeAnalysis.confidence,
-        clarity: realTimeAnalysis.clarity,
-        engagement: realTimeAnalysis.engagement,
-        presentationMetrics: { ...presentationScore },
         timestamp: new Date().toISOString(),
+        questionType: questionType,
       };
 
       setQuestionHistory(prev => [...prev, enhancedHistory]);
 
-      // Adaptive scoring with advanced metrics
+      // Update overall score
       const allScores = [...questionHistory.map(q => q.score), feedback.score || 0];
       const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
-      const presentationAvg = Object.values(presentationScore).reduce((a, b) => a + b, 0) / 4;
-      const analysisAvg = (realTimeAnalysis.confidence + realTimeAnalysis.clarity + realTimeAnalysis.engagement) / 3;
-
-      const finalScore = Math.round((avgScore * 0.6) + (presentationAvg * 0.2) + (analysisAvg * 0.2));
-      setScore(finalScore);
-
-      // Update adaptive context based on performance
-      const performancePattern = avgScore > 75 ? 'strong' : avgScore > 50 ? 'steady' : 'needs-improvement';
-      setAdaptiveContext(prev => ({
-        ...prev,
-        performancePattern,
-        strongAreas: feedback.strengths || [],
-        improvementAreas: feedback.improvements || [],
-        difficulty: performancePattern === 'strong' ? 'advanced' : performancePattern === 'steady' ? 'intermediate' : 'beginner',
-      }));
+      setScore(Math.round(avgScore));
 
       if (data.status === 'continue') {
-        // Generate next question using advanced AI
+        // Smart next question
         let nextQuestion;
         if (feedback.needsFollowUp) {
           setFollowUpMode(true);
           nextQuestion = await generateFollowUpQuestion(answer, currentQuestion);
         } else {
+          setFollowUpMode(false);
           nextQuestion = data.next_question || await generateAdvancedQuestion();
         }
 
@@ -403,7 +321,6 @@ Generate challenging but fair questions that assess both technical competency an
       } else {
         // Interview completed
         clearInterval(timerRef.current);
-        clearInterval(analysisRef.current);
         if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
         if (recognitionRef.current) recognitionRef.current.stop();
         navigate('/feedback');
@@ -579,85 +496,58 @@ Generate challenging but fair questions that assess both technical competency an
   // Interview Phase
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-gray-950/90 backdrop-blur-xl border-b border-white/[0.06]">
+      {/* Advanced Interview Header */}
+      <header className="sticky top-0 z-50 bg-gray-950/95 backdrop-blur-xl border-b border-white/[0.08]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-white/80">
-                <Clock className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm font-mono font-medium">{formatTime(timer)}</span>
-              </div>
-              <div className="hidden sm:flex items-center gap-2">
-                <span className="text-xs text-white/40">Progress:</span>
-                <Progress value={progress.current_question} max={progress.total_questions} className="w-28 h-2" />
-                <span className="text-xs text-white/60">{progress.current_question}/{progress.total_questions}</span>
-              </div>
-            </div>
-
-            {/* Real-time Analytics */}
+          <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-400" />
-                  <span className="text-xs text-white/60">Live:</span>
-                  <span className="text-sm font-medium text-blue-400">{liveScore}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-400" />
-                  <span className="text-sm font-medium text-white">{score}</span>
-                </div>
-                {followUpMode && (
-                  <Badge variant="secondary" className="bg-orange-500/20 text-orange-400 border-orange-500/30">
-                    <Zap className="w-3 h-3 mr-1" />
-                    Follow-up
-                  </Badge>
-                )}
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                <Clock className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm font-mono font-medium text-white">{formatTime(timer)}</span>
               </div>
-              <Badge variant="secondary">{emotion}</Badge>
-            </div>
-          </div>
 
-          {/* Advanced Analytics Bar */}
-          <div className="py-3 border-t border-white/[0.06]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-white/40">Confidence:</span>
+              <div className="hidden sm:flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-white/50">Progress:</span>
                   <div className="flex items-center gap-2">
-                    <Progress value={realTimeAnalysis.confidence} className="w-20 h-1.5" />
-                    <span className="text-xs text-white/60 w-8">{realTimeAnalysis.confidence}%</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-white/40">Clarity:</span>
-                  <div className="flex items-center gap-2">
-                    <Progress value={realTimeAnalysis.clarity} className="w-20 h-1.5" />
-                    <span className="text-xs text-white/60 w-8">{realTimeAnalysis.clarity}%</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-white/40">Engagement:</span>
-                  <div className="flex items-center gap-2">
-                    <Progress value={realTimeAnalysis.engagement} className="w-20 h-1.5" />
-                    <span className="text-xs text-white/60 w-8">{realTimeAnalysis.engagement}%</span>
+                    <Progress value={(progress.current_question / progress.total_questions) * 100} className="w-32 h-2" />
+                    <span className="text-xs text-white/70 font-mono">{progress.current_question}/{progress.total_questions}</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
                 <Badge
-                  variant={realTimeAnalysis.sentiment === 'positive' ? 'default' : 'secondary'}
-                  className={realTimeAnalysis.sentiment === 'positive' ? 'bg-green-500/20 text-green-400' : ''}
+                  variant="secondary"
+                  className={`${questionType === 'technical' ? 'bg-blue-500/20 text-blue-400' :
+                             questionType === 'behavioral' ? 'bg-purple-500/20 text-purple-400' :
+                             'bg-orange-500/20 text-orange-400'} border-0`}
                 >
-                  {realTimeAnalysis.sentiment}
+                  {questionType}
                 </Badge>
-                {adaptiveContext.difficulty !== config.difficulty && (
-                  <Badge variant="outline" className="text-yellow-400 border-yellow-500/30">
-                    Adapted: {adaptiveContext.difficulty}
-                  </Badge>
-                )}
+                <Badge variant="outline" className="text-white/70 border-white/20">
+                  {difficulty}
+                </Badge>
               </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                <span className="text-lg font-bold text-emerald-400">{score}</span>
+              </div>
+
+              {followUpMode && (
+                <Badge className="bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-400 border-orange-500/30">
+                  <Zap className="w-3 h-3 mr-1" />
+                  Follow-up
+                </Badge>
+              )}
+
+              <Badge variant="secondary" className="bg-white/5 text-white/80">
+                {emotion}
+              </Badge>
             </div>
           </div>
         </div>
@@ -669,70 +559,89 @@ Generate challenging but fair questions that assess both technical competency an
         )}
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Question + Answer */}
+          {/* Advanced Question + Answer Section */}
           <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-blue-500 flex items-center justify-center">
-                    <Brain className="w-5 h-5 text-white" />
+            {/* AI Interviewer Card */}
+            <Card className="bg-gradient-to-br from-gray-900/50 to-gray-800/30 border-white/10">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 via-blue-500 to-purple-500 flex items-center justify-center">
+                      <Brain className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                      <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                    </div>
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-base">AI Interviewer</CardTitle>
-                        <p className="text-xs text-white/40">Question {progress.current_question} of {progress.total_questions}</p>
+                        <CardTitle className="text-lg font-semibold text-white">AI Interviewer</CardTitle>
+                        <p className="text-sm text-white/50">Question {progress.current_question} of {progress.total_questions} • {questionType} interview</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {adaptiveContext.performancePattern === 'strong' && (
-                          <Badge className="bg-green-500/20 text-green-400">
-                            <Star className="w-3 h-3 mr-1" />
-                            Strong
-                          </Badge>
-                        )}
                         {followUpMode && (
-                          <Badge className="bg-orange-500/20 text-orange-400">
+                          <Badge className="bg-gradient-to-r from-orange-500/20 to-red-500/20 text-orange-400 border-orange-500/20">
                             <AlertCircle className="w-3 h-3 mr-1" />
-                            Drill-down
+                            Deep Dive
                           </Badge>
                         )}
+                        <Badge variant="outline" className="text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                          <Star className="w-3 h-3 mr-1" />
+                          Pro Mode
+                        </Badge>
                       </div>
                     </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="min-h-[120px] p-4 rounded-lg bg-white/[0.02] border border-white/[0.04]">
-                  <p className="text-white/90 leading-relaxed">{displayedQuestion}<span className="animate-pulse">|</span></p>
+                <div className="min-h-[140px] p-6 rounded-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] backdrop-blur-sm">
+                  <p className="text-white/95 leading-relaxed text-lg">
+                    {displayedQuestion}
+                    <span className="animate-pulse text-emerald-400 ml-1">|</span>
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Live Suggestions Panel */}
-            {suggestions.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <Card className="bg-blue-500/5 border-blue-500/20">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Lightbulb className="w-4 h-4 text-blue-400" />
-                      <span className="text-sm font-medium text-blue-400">Live Suggestions</span>
-                    </div>
-                    <div className="space-y-2">
-                      {suggestions.map((suggestion, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm text-blue-300">
-                          <CheckCircle className="w-3 h-3" />
-                          {suggestion}
+            {/* Smart Suggestions Panel */}
+            <AnimatePresence>
+              {suggestions.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Card className="bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-cyan-500/10 border-blue-500/20 backdrop-blur-sm">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                          <Lightbulb className="w-4 h-4 text-white" />
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
+                        <span className="text-sm font-semibold text-blue-300">Smart Suggestions</span>
+                        <div className="flex-1 h-px bg-gradient-to-r from-blue-500/50 to-transparent"></div>
+                      </div>
+                      <div className="space-y-3">
+                        {suggestions.map((suggestion, index) => (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="flex items-center gap-3 text-sm text-blue-200 bg-white/5 rounded-lg p-3"
+                          >
+                            <CheckCircle className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                            {suggestion}
+                          </motion.div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <Card>
               <CardContent className="p-5">
