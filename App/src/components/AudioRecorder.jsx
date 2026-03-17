@@ -12,12 +12,13 @@ import { Badge } from './ui/Badge';
 
 const AudioRecorder = ({
   onRecordingComplete,
-  onTranscriptionUpdate,
+  onTranscriptionUpdate = null, // Optional - for UI feedback only
   maxDuration = 120, // 2 minutes default
   autoStart = false,
   className = '',
-  sessionId = null, // For direct backend submission
+  sessionId = null, // For logging/tracking
   onAudioFileReady = null, // Callback when audio blob is ready
+  enableLocalTranscription = false, // Optional local transcription for UI feedback only
 }) => {
   // Recording state
   const [isRecording, setIsRecording] = useState(false);
