@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, Brain, Loader2, X, Sparkles, Plus, Settings,
   Activity, TrendingUp, Zap, Eye, Volume2, VolumeX, Headphones,
   BarChart3, AlertCircle, CheckCircle, Star, Lightbulb, Play, Pause,
+  Square
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -350,9 +351,14 @@ Generate challenging but fair questions that assess both technical competency an
         // Show mode notification
         if (isEnhanced) {
           console.log('🎤 Enhanced Audio Pipeline Mode Activated');
+          setError(''); // Clear any errors
         } else {
           console.log('📝 Standard Text Mode (Audio pipeline not available)');
           setError(''); // Clear any previous errors since fallback worked
+          // Show user-friendly notification
+          setTimeout(() => {
+            console.log('ℹ️ Using standard text interview mode. Audio features will be available when backend is updated.');
+          }, 1000);
         }
       }
     } catch (err) {
