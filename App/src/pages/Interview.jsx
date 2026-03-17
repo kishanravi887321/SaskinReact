@@ -146,7 +146,23 @@ export default function Interview() {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
-      startRealTimeAnalysis();
+
+      // Start real-time analysis
+      analysisRef.current = setInterval(() => {
+        setRealTimeAnalysis(prev => ({
+          ...prev,
+          confidence: Math.min(100, Math.max(0, prev.confidence + (Math.random() - 0.5) * 10)),
+          clarity: Math.min(100, Math.max(0, prev.clarity + (Math.random() - 0.5) * 8)),
+          engagement: Math.min(100, Math.max(0, prev.engagement + (Math.random() - 0.5) * 12)),
+        }));
+
+        setPresentationScore(prev => ({
+          eyeContact: Math.min(100, Math.max(0, prev.eyeContact + (Math.random() - 0.5) * 5)),
+          posture: Math.min(100, Math.max(0, prev.posture + (Math.random() - 0.5) * 3)),
+          gestures: Math.min(100, Math.max(0, prev.gestures + (Math.random() - 0.5) * 7)),
+          voice: Math.min(100, Math.max(0, prev.voice + (Math.random() - 0.5) * 6)),
+        }));
+      }, 2000);
     } catch {
       console.log('Camera access denied');
     }
@@ -175,38 +191,6 @@ export default function Interview() {
       };
     }
   }, []);
-
-  // Real-time Analysis Engine
-  const startRealTimeAnalysis = useCallback(() => {
-    analysisRef.current = setInterval(() => {
-      // Simulate AI analysis (replace with actual AI service)
-      const confidence = Math.min(100, Math.max(0,
-        realTimeAnalysis.confidence + (Math.random() - 0.5) * 10));
-      const clarity = Math.min(100, Math.max(0,
-        realTimeAnalysis.clarity + (Math.random() - 0.5) * 8));
-      const engagement = Math.min(100, Math.max(0,
-        realTimeAnalysis.engagement + (Math.random() - 0.5) * 12));
-
-      setRealTimeAnalysis(prev => ({
-        ...prev,
-        confidence: Math.round(confidence),
-        clarity: Math.round(clarity),
-        engagement: Math.round(engagement),
-      }));
-
-      // Update presentation score
-      setPresentationScore(prev => ({
-        eyeContact: Math.min(100, Math.max(0, prev.eyeContact + (Math.random() - 0.5) * 5)),
-        posture: Math.min(100, Math.max(0, prev.posture + (Math.random() - 0.5) * 3)),
-        gestures: Math.min(100, Math.max(0, prev.gestures + (Math.random() - 0.5) * 7)),
-        voice: Math.min(100, Math.max(0, prev.voice + (Math.random() - 0.5) * 6)),
-      }));
-
-      // Generate live score
-      const avgAnalysis = (confidence + clarity + engagement) / 3;
-      setLiveScore(Math.round(avgAnalysis));
-    }, 2000);
-  }, [realTimeAnalysis]);
 
   const analyzeAnswerInRealTime = useCallback((text) => {
     // AI-powered real-time analysis
