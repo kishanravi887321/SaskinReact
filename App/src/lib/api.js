@@ -77,12 +77,9 @@ export async function submitAnswer(sessionId, answer, analysisData = null) {
     answer,
   };
 
-  // Include advanced analytics if provided
-  if (analysisData) {
-    payload.real_time_metrics = analysisData.realTimeMetrics;
-    payload.presentation_score = analysisData.presentationScore;
-    payload.time_spent = analysisData.timeSpent;
-    payload.adaptive_context = analysisData.context;
+  // Include additional data if provided (optional for advanced features)
+  if (analysisData && Object.keys(analysisData).length > 0) {
+    payload.metadata = analysisData;
   }
 
   return apiRequest(API_ENDPOINTS.interview.answer, {
