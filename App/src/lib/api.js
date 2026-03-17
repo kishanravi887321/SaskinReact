@@ -6,6 +6,11 @@ export const API_ENDPOINTS = {
     start: '/api/central/v1/interview/start/',
     answer: '/api/central/v1/interview/answer/',
     end: '/api/central/v1/interview/end/',
+    // Audio Pipeline Endpoints
+    submitAudio: '/api/interview/submit-audio/',
+    session: '/api/interview/session/',
+    cleanup: '/api/interview/session/{session_id}/cleanup/',
+    generateAudio: '/api/interview/generate-audio/',
   },
   user: {
     profile: '/api/users/profile/',
