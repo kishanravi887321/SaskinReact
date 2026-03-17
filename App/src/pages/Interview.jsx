@@ -270,23 +270,58 @@ export default function Interview() {
     setLoading(true);
     setError('');
     try {
-      // START ENHANCED INTERVIEW (NEW API from UI.txt)
-      const result = await startEnhancedInterview(
-        role,
-        config.experience,
-        config.industry,
-        true // Enable audio pipeline
-      );
+      let result;
+      let isEnhanced = false;
 
-      if (result.status === 'success') {
+      // TRY ENHANCED INTERVIEW FIRST (NEW API from UI.txt)
+      try {
+        console.log('Attempting enhanced interview start...');
+        result = await startEnhancedInterview(
+          role,
+          config.experience || 'Mid-level',
+          config.industry || 'Technology',
+          true // Enable audio pipeline
+        );
+        isEnhanced = true;
+        console.log('✅ Enhanced interview started successfully:', result);
+      } catch (enhancedError) {
+        console.warn('⚠️ Enhanced interview not available, falling back to standard interview:', enhancedError);
+
+        // FALLBACK TO STANDARD INTERVIEW API
+        const enhancedConfig = {
+          ...config,
+          role,
+          ai_prompt: `You are an expert ${role} interviewer conducting a real-world professional interview.
+
+Guidelines:
+- Ask one high-quality, scenario-based question at a time
+- Focus on real-world problem-solving over theoretical knowledge
+- Encourage STAR format answers (Situation, Task, Action, Result)
+- Adapt difficulty based on candidate responses
+- Evaluate technical depth, communication clarity, and problem-solving approach
+- Ask relevant follow-up questions when answers lack depth
+
+Current Context: ${config.interview_type} interview for ${role} role
+Experience Level: ${config.experience}
+Skills Focus: ${config.skills.join(', ')}
+
+Generate challenging but fair questions that assess both technical competency and leadership potential.`,
+        };
+
+        result = await startInterview(enhancedConfig);
+        isEnhanced = false;
+        console.log('✅ Standard interview started:', result);
+      }
+
+      if (result && (result.status === 'success' || result.session_id)) {
         // Update enhanced state
         setEnhancedState(prev => ({
           ...prev,
           sessionId: result.session_id,
           currentQuestion: result.question,
           status: 'active',
-          audioEnabled: result.audio_enabled,
-          pipelineActive: result.pipeline_active,
+          audioEnabled: isEnhanced ? (result.audio_enabled || false) : false,
+          pipelineActive: isEnhanced ? (result.pipeline_active || false) : false,
           questionNumber: 1
         }));
 
@@ -296,8 +331,8 @@ export default function Interview() {
         setProgress(result.progress || { current_question: 1, total_questions: 10 });
         setPhase('interview');
 
-        // Auto-play first question audio if available
-        if (result.question_audio_url) {
+        // Auto-play first question audio if available (enhanced mode only)
+        if (isEnhanced && result.question_audio_url) {
           setAudioUrls(prev => ({
             ...prev,
             questionAudio: result.question_audio_url
@@ -311,10 +346,18 @@ export default function Interview() {
         // Set interview mode based on config
         setDifficulty(config.difficulty);
         setQuestionType(config.interview_type);
+
+        // Show mode notification
+        if (isEnhanced) {
+          console.log('🎤 Enhanced Audio Pipeline Mode Activated');
+        } else {
+          console.log('📝 Standard Text Mode (Audio pipeline not available)');
+          setError(''); // Clear any previous errors since fallback worked
+        }
       }
     } catch (err) {
-      setError(err.message || 'Failed to start enhanced interview');
-      console.error('Enhanced interview start failed:', err);
+      setError(err.message || 'Failed to start interview');
+      console.error('Interview start failed:', err);
     } finally {
       setLoading(false);
     }
@@ -433,142 +476,233 @@ export default function Interview() {
     }
   };
 
-  // Submit Audio Through Pipeline (from UI.txt)
+  // Submit Audio Through Pipeline (from UI.txt) with Fallback
   const submitAudioResponse = async (audioBlob) => {
     try {
-      const result = await submitAudioResponsePipeline(enhancedState.sessionId, audioBlob);
+      // Only attempt enhanced pipeline if it's active
+      if (enhancedState.pipelineActive && enhancedState.audioEnabled) {
+        console.log('Submitting through enhanced audio pipeline...');
+        const result = await submitAudioResponsePipeline(enhancedState.sessionId, audioBlob);
 
-      if (result.status === 'success') {
-        // PIPELINE RESULTS:
-        setEnhancedState(prev => ({
-          ...prev,
-          transcription: result.transcription,        // VTT output
-          feedback: result.feedback,                  // Gemini AI response
-          isProcessing: false
-        }));
-
-        // Update question history
-        const newHistoryItem = {
-          question: enhancedState.currentQuestion || currentQuestion,
-          answer: result.transcription,
-          score: result.feedback?.score || 0,
-          feedback: result.feedback?.evaluation || '',
-          strengths: result.feedback?.strengths || [],
-          improvements: result.feedback?.areas_for_improvement || [],
-          timestamp: new Date().toISOString(),
-          questionType: questionType,
-        };
-
-        setQuestionHistory(prev => [...prev, newHistoryItem]);
-
-        // Update overall score
-        const allScores = [...questionHistory.map(q => q.score), result.feedback?.score || 0];
-        const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
-        setScore(Math.round(avgScore));
-
-        // Play AI feedback audio (TTV output)
-        if (result.audio_urls?.feedback_audio) {
-          setAudioUrls(prev => ({
+        if (result.status === 'success') {
+          // PIPELINE RESULTS:
+          setEnhancedState(prev => ({
             ...prev,
-            feedbackAudio: result.audio_urls.feedback_audio
+            transcription: result.transcription,        // VTT output
+            feedback: result.feedback,                  // Gemini AI response
+            isProcessing: false
           }));
-          setTimeout(() => playAudio(result.audio_urls.feedback_audio), 1000);
-        }
 
-        // Handle next question or completion
-        if (result.interview_status === 'continue') {
-          setTimeout(() => {
-            setEnhancedState(prev => ({
-              ...prev,
-              currentQuestion: result.next_question,
-              questionNumber: result.progress?.current_question || prev.questionNumber + 1,
-              transcription: '',
-              feedback: null
-            }));
+          // Update question history
+          const newHistoryItem = {
+            question: enhancedState.currentQuestion || currentQuestion,
+            answer: result.transcription,
+            score: result.feedback?.score || 0,
+            feedback: result.feedback?.evaluation || '',
+            strengths: result.feedback?.strengths || [],
+            improvements: result.feedback?.areas_for_improvement || [],
+            timestamp: new Date().toISOString(),
+            questionType: questionType,
+          };
 
-            setCurrentQuestion(result.next_question);
-            setProgress(result.progress || progress);
-            setAnswer('');
-            setSuggestions([]);
+          setQuestionHistory(prev => [...prev, newHistoryItem]);
 
-            // Play next question audio
-            if (result.audio_urls?.next_question_audio) {
-              setAudioUrls(prev => ({
-                ...prev,
-                questionAudio: result.audio_urls.next_question_audio
-              }));
-              playAudio(result.audio_urls.next_question_audio);
-            }
-          }, 3000);
-        } else if (result.interview_status === 'completed') {
-          setEnhancedState(prev => ({ ...prev, status: 'completed' }));
+          // Update overall score
+          const allScores = [...questionHistory.map(q => q.score), result.feedback?.score || 0];
+          const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+          setScore(Math.round(avgScore));
 
-          // Play final summary audio
-          if (result.audio_urls?.summary_audio) {
+          // Play AI feedback audio (TTV output)
+          if (result.audio_urls?.feedback_audio) {
             setAudioUrls(prev => ({
               ...prev,
-              summaryAudio: result.audio_urls.summary_audio
+              feedbackAudio: result.audio_urls.feedback_audio
             }));
-            playAudio(result.audio_urls.summary_audio);
+            setTimeout(() => playAudio(result.audio_urls.feedback_audio), 1000);
           }
 
-          // Navigate to feedback after delay
-          setTimeout(() => navigate('/feedback'), 5000);
+          // Handle next question or completion
+          if (result.interview_status === 'continue') {
+            setTimeout(() => {
+              setEnhancedState(prev => ({
+                ...prev,
+                currentQuestion: result.next_question,
+                questionNumber: result.progress?.current_question || prev.questionNumber + 1,
+                transcription: '',
+                feedback: null
+              }));
+
+              setCurrentQuestion(result.next_question);
+              setProgress(result.progress || progress);
+              setAnswer('');
+              setSuggestions([]);
+
+              // Play next question audio
+              if (result.audio_urls?.next_question_audio) {
+                setAudioUrls(prev => ({
+                  ...prev,
+                  questionAudio: result.audio_urls.next_question_audio
+                }));
+                playAudio(result.audio_urls.next_question_audio);
+              }
+            }, 3000);
+          } else if (result.interview_status === 'completed') {
+            setEnhancedState(prev => ({ ...prev, status: 'completed' }));
+
+            // Play final summary audio
+            if (result.audio_urls?.summary_audio) {
+              setAudioUrls(prev => ({
+                ...prev,
+                summaryAudio: result.audio_urls.summary_audio
+              }));
+              playAudio(result.audio_urls.summary_audio);
+            }
+
+            // Navigate to feedback after delay
+            setTimeout(() => navigate('/feedback'), 5000);
+          }
+
+          return; // Exit early if enhanced pipeline worked
         }
       }
+
+      // FALLBACK: Convert audio to text and submit as text
+      console.log('Enhanced pipeline not available, attempting text conversion...');
+
+      // Simple fallback: prompt user to type their answer
+      const fallbackAnswer = prompt('Audio processing not available. Please type your answer:');
+
+      if (fallbackAnswer && fallbackAnswer.trim()) {
+        await submitTextResponse(fallbackAnswer.trim());
+      } else {
+        setError('Please provide a text answer since audio processing is not available.');
+        setEnhancedState(prev => ({ ...prev, isProcessing: false }));
+      }
+
     } catch (error) {
       console.error('Audio processing failed:', error);
-      setError(`Audio processing failed: ${error.message}`);
+      setError(`Audio processing failed: ${error.message}. Please use text input instead.`);
       setEnhancedState(prev => ({ ...prev, isProcessing: false }));
+
+      // Fallback to text input
+      promptTextInput();
     }
   };
 
-  // Text Fallback Mode (from UI.txt)
+  // Text Fallback Mode (from UI.txt) with Standard API Fallback
   const submitTextResponse = async (textAnswer) => {
     try {
-      const result = await submitTextResponsePipeline(enhancedState.sessionId, textAnswer);
+      let result;
+      let isEnhanced = false;
 
-      if (result.status === 'success') {
-        setEnhancedState(prev => ({
-          ...prev,
-          transcription: textAnswer,
-          feedback: result.feedback,
-          isProcessing: false
-        }));
+      // Try enhanced pipeline first if available
+      if (enhancedState.pipelineActive) {
+        try {
+          console.log('Submitting text through enhanced pipeline...');
+          result = await submitTextResponsePipeline(enhancedState.sessionId, textAnswer);
+          isEnhanced = true;
+        } catch (enhancedError) {
+          console.warn('Enhanced text pipeline failed, falling back to standard API:', enhancedError);
+          // Fall through to standard API
+        }
+      }
 
-        // Update question history (same logic as audio response)
-        const newHistoryItem = {
-          question: enhancedState.currentQuestion || currentQuestion,
-          answer: textAnswer,
-          score: result.feedback?.score || 0,
-          feedback: result.feedback?.evaluation || '',
-          strengths: result.feedback?.strengths || [],
-          improvements: result.feedback?.areas_for_improvement || [],
-          timestamp: new Date().toISOString(),
-          questionType: questionType,
-        };
+      // Fallback to standard API
+      if (!isEnhanced) {
+        console.log('Using standard text submission API...');
+        result = await submitAnswer(sessionId, textAnswer);
+        isEnhanced = false;
+      }
 
-        setQuestionHistory(prev => [...prev, newHistoryItem]);
+      if (result && (result.status === 'success' || result.feedback)) {
+        if (isEnhanced) {
+          // Enhanced response format
+          setEnhancedState(prev => ({
+            ...prev,
+            transcription: textAnswer,
+            feedback: result.feedback,
+            isProcessing: false
+          }));
 
-        // Continue with next question or complete interview
-        if (result.interview_status === 'continue') {
-          setTimeout(() => {
-            setEnhancedState(prev => ({
-              ...prev,
-              currentQuestion: result.next_question,
-              questionNumber: result.progress?.current_question || prev.questionNumber + 1,
-              transcription: '',
-              feedback: null
-            }));
+          // Update question history (enhanced format)
+          const newHistoryItem = {
+            question: enhancedState.currentQuestion || currentQuestion,
+            answer: textAnswer,
+            score: result.feedback?.score || 0,
+            feedback: result.feedback?.evaluation || '',
+            strengths: result.feedback?.strengths || [],
+            improvements: result.feedback?.areas_for_improvement || [],
+            timestamp: new Date().toISOString(),
+            questionType: questionType,
+          };
 
-            setCurrentQuestion(result.next_question);
+          setQuestionHistory(prev => [...prev, newHistoryItem]);
+
+          // Continue with next question or complete interview
+          if (result.interview_status === 'continue') {
+            setTimeout(() => {
+              setEnhancedState(prev => ({
+                ...prev,
+                currentQuestion: result.next_question,
+                questionNumber: result.progress?.current_question || prev.questionNumber + 1,
+                transcription: '',
+                feedback: null
+              }));
+
+              setCurrentQuestion(result.next_question);
+              setProgress(result.progress || progress);
+              setAnswer('');
+              setSuggestions([]);
+            }, 3000);
+          } else {
+            setEnhancedState(prev => ({ ...prev, status: 'completed' }));
+            setTimeout(() => navigate('/feedback'), 3000);
+          }
+        } else {
+          // Standard response format
+          const feedback = result.feedback || {};
+
+          // Enhanced question history for standard API
+          const enhancedHistory = {
+            question: currentQuestion,
+            answer: textAnswer,
+            score: feedback.score || 0,
+            feedback: feedback.feedback || '',
+            strengths: feedback.strengths || [],
+            improvements: feedback.improvements || [],
+            timestamp: new Date().toISOString(),
+            questionType: questionType,
+          };
+
+          setQuestionHistory(prev => [...prev, enhancedHistory]);
+
+          // Update overall score
+          const allScores = [...questionHistory.map(q => q.score), feedback.score || 0];
+          const avgScore = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+          setScore(Math.round(avgScore));
+
+          if (result.status === 'continue') {
+            // Smart next question
+            let nextQuestion;
+            if (feedback.needsFollowUp) {
+              setFollowUpMode(true);
+              nextQuestion = await generateFollowUpQuestion(textAnswer, currentQuestion);
+            } else {
+              setFollowUpMode(false);
+              nextQuestion = result.next_question || await generateAdvancedQuestion();
+            }
+
+            setCurrentQuestion(nextQuestion);
             setProgress(result.progress || progress);
             setAnswer('');
             setSuggestions([]);
-          }, 3000);
-        } else {
-          setEnhancedState(prev => ({ ...prev, status: 'completed' }));
-          setTimeout(() => navigate('/feedback'), 3000);
+          } else {
+            // Interview completed
+            clearInterval(timerRef.current);
+            if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+            if (recognitionRef.current) recognitionRef.current.stop();
+            navigate('/feedback');
+          }
         }
       }
     } catch (error) {
